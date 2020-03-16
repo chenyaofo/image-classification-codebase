@@ -19,7 +19,7 @@ class Args(TypedArgs):
     optimizer: str = add_argument('--optimizer', default='sgd')
     lr: float = add_argument('--lr', default=0.1)
     momentum: float = add_argument('--momentum', default=0.9)
-    weight_decay: float = add_argument('--weight_decay', default=3e-5)
+    weight_decay: float = add_argument('--weight_decay', default=1e-5)
 
     scheduler: str = add_argument('--scheduler', default='warmup_cosine')
     warmup_epochs: int = add_argument('--warmup_epochs', default=5)
