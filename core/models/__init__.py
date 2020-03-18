@@ -1,6 +1,6 @@
 from .MoGA import MoGaA, MoGaB, MoGaC
 from .mobilenet import mobilenet_v2
-from torchvision.models import resnet18
+# from torchvision.models import resnet18
 from .mobilenetv3 import MobileNetV3_Large
 
 def moga_a(args):
