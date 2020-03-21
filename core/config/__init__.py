@@ -9,10 +9,9 @@ class Args(TypedArgs):
     data: str = add_argument('--data', metavar='DIR', help='path to dataset')
     model: str = add_argument('--model', metavar='ARCH', default='moga_a')
 
-    dali:bool = add_argument('--dali',action='store_true', default=False)
+    dali: bool = add_argument('--dali', action='store_true', default=False)
     max_epochs: int = add_argument('--max_epochs', default=150)
     criterion: str = add_argument('--criterion', default='ce')
-
 
     dataset: str = add_argument('--dataset', default='imagenet')
 
@@ -25,7 +24,6 @@ class Args(TypedArgs):
     warmup_epochs: int = add_argument('--warmup_epochs', default=5)
     eta_min: float = add_argument('--eta_min', default=1e-3)
 
-
     batch_size: int = add_argument("-b", "--batch_size", default=64)
     num_workers: int = add_argument('-j', '--workers', default=8, metavar='N',
                                     help='number of data loading workers (default: 4)')
@@ -35,6 +33,10 @@ class Args(TypedArgs):
     resume: str = add_argument("--resume", default=None)
 
     report_freq: int = add_argument("--report_freq", default=10)
+
+    exponential_lr_lambda: float = add_argument('--exponential_lr_lambda', default=0.97)
+    dropout: float = add_argument('--dropout', default=0.2)
+    bn_momentum: float = add_argument('--bn_momentum', default=0.1)
 
 
 args = Args.from_known_args(sys.argv)

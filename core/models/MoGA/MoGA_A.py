@@ -7,11 +7,13 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+from core.config import args
+
 
 def stem(inp, oup, stride):
     return nn.Sequential(
         nn.Conv2d(inp, oup, 3, stride, 1, bias=False),
-        nn.BatchNorm2d(oup),
+        nn.BatchNorm2d(oup, momentum=args.bn_momentum),
         # nn.ReLU6(inplace=True)
         Hswish()
     )
@@ -20,28 +22,34 @@ def stem(inp, oup, stride):
 def separable_conv(inp, oup):
     return nn.Sequential(
         nn.Conv2d(inp, inp, 3, 1, 1, groups=inp, bias=False),
-        nn.BatchNorm2d(inp),
+        nn.BatchNorm2d(inp, momentum=args.bn_momentum),
         nn.ReLU(inplace=True),
         nn.Conv2d(inp, oup, 1, 1, 0, bias=False),
-        nn.BatchNorm2d(oup),
+        nn.BatchNorm2d(oup, momentum=args.bn_momentum),
     )
 
 
 def conv_before_pooling(inp, oup):
     return nn.Sequential(
         nn.Conv2d(inp, oup, 1, 1, 0, bias=False),
-        nn.BatchNorm2d(oup),
+        nn.BatchNorm2d(oup, momentum=args.bn_momentum),
         # nn.ReLU6(inplace=True)
         Hswish()
     )
 
 
 def conv_head(inp, oup):
-    return nn.Sequential(
+    if args.dropout == 0:
+        return nn.Sequential(
             nn.Conv2d(inp, oup, 1, bias=False),
             Hswish(inplace=True),
-            nn.Dropout2d(0.2)
-    )
+        )
+    else:
+        return nn.Sequential(
+            nn.Conv2d(inp, oup, 1, bias=False),
+            Hswish(inplace=True),
+            nn.Dropout2d(args.dropout)
+        )
 
 
 def classifier(inp, nclass):
@@ -85,6 +93,7 @@ class SEModule(nn.Module):
         y = self.fc(y)
         return torch.mul(x, y)
 
+
 class InvertedResidual(nn.Module):
     def __init__(self, inp, oup, kernel_size, stride, expand_ratio, act, se):
         super(InvertedResidual, self).__init__()
@@ -96,13 +105,13 @@ class InvertedResidual(nn.Module):
         hidden_dim = round(inp * expand_ratio)
         self.use_res_connect = self.stride == 1 and inp == oup
         self.conv1 = nn.Conv2d(inp, hidden_dim, 1, 1, 0, bias=False)
-        self.bn1 = nn.BatchNorm2d(hidden_dim)
+        self.bn1 = nn.BatchNorm2d(hidden_dim, momentum=args.bn_momentum)
         self.conv2 = nn.Conv2d(hidden_dim, hidden_dim, kernel_size, stride, padding, groups=hidden_dim, bias=False)
-        self.bn2 = nn.BatchNorm2d(hidden_dim)
+        self.bn2 = nn.BatchNorm2d(hidden_dim, momentum=args.bn_momentum)
         if self.se:
             self.mid_se = SEModule(hidden_dim, act)
         self.conv3 = nn.Conv2d(hidden_dim, oup, 1, 1, 0, bias=False)
-        self.bn3 = nn.BatchNorm2d(oup)
+        self.bn3 = nn.BatchNorm2d(oup, momentum=args.bn_momentum)
 
     def forward(self, x):
         inputs = x
@@ -156,8 +165,8 @@ class MoGaA(nn.Module):
         input_channel = second_filter
         for t, c, k, s, a, se in mb_config:
             output_channel = c
-            act = nn.ReLU(inplace=True) if a==0 else Hswish(inplace=True)
-            self.mb_module.append(InvertedResidual(input_channel, output_channel, k, s, expand_ratio=t, act=act, se=se!=0))
+            act = nn.ReLU(inplace=True) if a == 0 else Hswish(inplace=True)
+            self.mb_module.append(InvertedResidual(input_channel, output_channel, k, s, expand_ratio=t, act=act, se=se != 0))
             input_channel = output_channel
         self.mb_module = nn.Sequential(*self.mb_module)
         self.conv_before_pooling = conv_before_pooling(input_channel, second_last_filter)
