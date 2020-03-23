@@ -1,3 +1,5 @@
+from functools import wraps
+import inspect
 import os
 
 import torch
@@ -55,9 +57,58 @@ def torchsave(*args, **kwargs):
     if is_master():
         torch.save(*args, **kwargs)
 
+
 def dummy_func(*args, **kargs):
     pass
+
 
 class DummyClass():
     def __getattribute__(self, obj):
         return dummy_func
+
+
+class FakeObj:
+    def __getattr__(self, name):
+        return do_nothing
+
+
+def do_nothing(*args, **kwargs) -> FakeObj:
+    return FakeObj()
+
+
+def only_master_fn(fn):
+    @wraps(fn)
+    def wrapper(*args, **kwargs):
+        if is_master() or kwargs.get('run_anyway', False):
+            kwargs.pop('run_anyway', None)
+            return fn(*args, **kwargs)
+        else:
+            return FakeObj()
+
+    return wrapper
+
+
+def only_master_cls(cls):
+    for key, value in cls.__dict__.items():
+        if callable(value):
+            setattr(cls, key, only_master_fn(value))
+
+    return cls
+
+
+def only_master_obj(obj):
+    cls = obj.__class__
+    for key, value in cls.__dict__.items():
+        if callable(value):
+            obj.__dict__[key] = only_master_fn(value).__get__(obj, cls)
+
+    return obj
+
+
+def only_master(something):
+    if inspect.isfunction(something):
+        return only_master_fn(something)
+    elif inspect.isclass(something):
+        return only_master_cls(something)
+    else:
+        return only_master_obj(something)
