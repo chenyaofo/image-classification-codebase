@@ -38,15 +38,15 @@ def is_dist_avail_and_init():
 
 
 def rank():
-    return dist.get_rank() if is_dist_avail_and_init else 0
+    return dist.get_rank() if is_dist_avail_and_init() else 0
 
 
 def local_rank():
-    return int(os.environ["LOCAL_RANK"]) if is_dist_avail_and_init else 0
+    return int(os.environ["LOCAL_RANK"]) if is_dist_avail_and_init() else 0
 
 
 def world_size():
-    return dist.get_world_size() if is_dist_avail_and_init else 1
+    return dist.get_world_size() if is_dist_avail_and_init() else 1
 
 
 def is_master():
