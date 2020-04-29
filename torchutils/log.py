@@ -4,7 +4,6 @@ import time
 import typing
 import logging
 import argparse
-import pyhocon
 import glob
 import zipfile
 
@@ -13,7 +12,7 @@ try:
     from torch.utils.tensorboard import SummaryWriter
 except ImportError:
     from tensorboardX import SummaryWriter
-    
+
 from .distributed import init, is_master, DummyClass
 T = typing.TypeVar("T")
 

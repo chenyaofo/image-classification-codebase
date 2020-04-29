@@ -9,7 +9,7 @@ import torch.optim as optim
 from .distributed import torchsave
 
 
-def generate_random_from_system():
+def generate_random_seed():
     return int.from_bytes(os.urandom(2), byteorder="little", signed=False)
 
 
@@ -62,9 +62,9 @@ def compute_flops(module: nn.Module, size):
 
 def get_last_commit_id():
     try:
-        output = subprocess.check_output(['git', 'rev-parse', 'HEAD']).decode("utf-8")
-        output = output.strip()
-        return output
+        commit_id = subprocess.check_output(['git', 'rev-parse', 'HEAD']).decode("utf-8")
+        commit_id = commit_id.strip()
+        return commit_id
     except subprocess.CalledProcessError as e:
         out_bytes = e.output
         code = e.returncode
