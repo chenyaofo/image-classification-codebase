@@ -7,9 +7,9 @@ import torch.optim as optim
 import logging
 import enum
 import functools
-import utils
-from utils.distributed import world_size
-from utils.metrics import AccuracyMetric, AverageMetric, EstimatedTimeArrival
+import torchutils
+from torchutils.distributed import world_size
+from torchutils.metrics import AccuracyMetric, AverageMetric, EstimatedTimeArrival
 
 
 def fetch(datas):

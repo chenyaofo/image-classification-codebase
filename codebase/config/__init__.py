@@ -1,7 +1,7 @@
 import sys
 from dataclasses import dataclass
 
-from utils.typed_args import TypedArgs, add_argument
+from torchutils.typed_args import TypedArgs, add_argument
 
 
 @dataclass
