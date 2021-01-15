@@ -1,21 +1,48 @@
-# image-classification-codebase
+# Image Classification Codebase
+
+This project **aims** to provide a codebase for the image classification task implemented by PyTorch.
+It does not use any high-level deep learning libraries (such as pytorch-lightening or MMClassification).
+Thus, it should be easy to follow and modified.
+Note that this project **does not aim** to offer any pretrained models.
+
+## Get Started
+
+### Requirements
+
+ - Python 3.7+
+ - PyTorch 1.4+
+ - Torchvision
+ - DALI 0.28+ (Optional)
+
+### Basic Usage
+
+### Train with Custom Model
+
+### Train with Custom Dataset
 
 
+## Features
 
-## Data Preprocessing with DALI
+ - Distributed training support (Use native Pytorch API).
+ - DALI data processing support.
 
-Use DALI to perform data preprocessing by set "--dali" option.
+## Roadmap
+  
+  - AMP support.
+  - Auto checkpoint support.
+  - Other tricks.
 
-### Installation
-
-Execute the below command CUDA 9.0 based build:
+## Cite
 
 ```
-pip install --extra-index-url https://developer.download.nvidia.com/compute/redist/cuda/9.0 nvidia-dali
+@misc{chen2020image,
+  author = {Yaofo Chen},
+  title = {Image Classification Codebase},
+  year = {2020},
+  publisher = {GitHub},
+  journal = {GitHub repository},
+  howpublished = {\url{https://github.com/chenyaofo/image-classification-codebase}}
+}
 ```
 
-Starting DALI 0.8.0 for CUDA 10.0 based build use:
-
-```
-pip install --extra-index-url https://developer.download.nvidia.com/compute/redist/cuda/10.0 nvidia-dali
-```
+## License
