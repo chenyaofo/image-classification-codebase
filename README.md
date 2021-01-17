@@ -5,16 +5,18 @@ It does not use any high-level deep learning libraries (such as pytorch-lighteni
 Thus, it should be easy to follow and modified.
 Note that this project **does not aim** to offer any pretrained models.
 
-## Get Started
-
-### Requirements
+## Requirements
 
  - Python 3.7+
  - PyTorch 1.4+
  - Torchvision
  - DALI 0.28+ (Optional)
 
+## Get Started
+
 ### Basic Usage
+
+### Finetune with Existing Model
 
 ### Train with Custom Model
 
@@ -29,7 +31,7 @@ Note that this project **does not aim** to offer any pretrained models.
 ## Roadmap
   
   - AMP support.
-  - Auto checkpoint support.
+  - Auto recomputation support.
   - Other tricks.
 
 ## Cite
