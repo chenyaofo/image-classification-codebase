@@ -32,6 +32,7 @@ Note that this project **does not aim** to offer any pretrained models.
   
   - AMP support.
   - Auto recomputation support.
+  - Auto resume from checkpoint.
   - Other tricks.
 
 ## Cite
