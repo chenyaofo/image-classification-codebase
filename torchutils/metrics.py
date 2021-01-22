@@ -4,6 +4,8 @@ import typing
 import torch
 import torch.distributed as dist
 
+EPSILON = 1e-8
+
 _str_2_reduceop = dict(
     sum=dist.ReduceOp.SUM,
     mean=dist.ReduceOp.SUM,
@@ -103,6 +105,56 @@ class AccuracyMetric(object):
         return accuracy
 
 
+class ConfusionMatrix(object):
+    def __init__(self, num_classes):
+        self._is_distributed = dist.is_available() and dist.is_initialized()
+        self.num_classes = num_classes
+        self.matrix = None
+        self.reset()
+
+    def reset(self):
+        self.matrix = torch.zeros(size=(self.num_classes,)*2,
+                                  dtype=torch.int64, device="cuda")
+        self._reset_buffer()
+
+    def _reset_buffer(self):
+        self._matrix_since_last_sync = torch.zeros(size=(self.num_classes,)*2,
+                                  dtype=torch.int64, device="cuda")
+        self._is_synced = True
+
+    def update(self, targets, predictions):
+        predictions = torch.argmax(predictions, dim=1)
+        targets, predictions = targets.flatten(), predictions.flatten()
+        indices = targets * self.num_classes + predictions
+        m = torch.bincount(indices, minlength=self.num_classes **
+                           2).reshape(self.num_classes, self.num_classes)
+
+        self._matrix_since_last_sync += m.to(device=self.matrix.device)
+        self._is_synced = False
+
+    def sync(self):
+        if self._is_synced:
+            return
+        self._is_synced = True
+
+    def pixel_accuracy(self):
+        self.sync()
+        m = self.matrix.float()
+        return (m.diag().sum()/(m.sum()+EPSILON)).item()
+    
+    def mean_pixel_accuracy(self):
+        self.sync()
+        m = self.matrix.float()
+        return (m.diag()/m.sum(dim=1)).mean().item()
+    
+    def mean_intersection_over_union(self):
+        self.sync()
+        m = self.matrix.float()
+        diag = m.diag()
+        return (diag/(m.sum(dim=0)+m.sum(dim=1)-diag+EPSILON)).mean().item()
+
+
+
 class AverageMetric(object):
     def __init__(self):
         self._is_distributed = dist.is_available() and dist.is_initialized()
@@ -142,7 +194,7 @@ class AverageMetric(object):
 
     def compute(self) -> float:
         self.sync()
-        return self._value / (self._n+1e-8)
+        return self._value / (self._n+EPSILON)
 
 
 class EstimatedTimeArrival(object):

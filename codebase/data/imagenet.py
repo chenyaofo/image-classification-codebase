@@ -12,7 +12,7 @@ try:
     import nvidia.dali.ops as ops
     import nvidia.dali.types as types
     from nvidia.dali.pipeline import Pipeline
-    from nvidia.dali.plugin.pytorch import DALIClassificationIterator
+    from nvidia.dali.plugin.pytorch import DALIGenericIterator
 except ImportError:
     raise ImportError("Please install DALI refer to "
                       "https://docs.nvidia.com/deeplearning/sdk/dali-developer-guide/docs/installation.html.")
@@ -97,8 +97,11 @@ class ImageNet:
                                      data_dir=os.path.join(args.data, "train"),
                                      crop=args.image_size)
         train_pipe.build()
-        train_loader = DALIClassificationIterator([train_pipe],
-                                                  train_pipe.epoch_size("Reader") / world_size())
+        train_loader = DALIGenericIterator(pipelines=train_pipe,
+                                           output_map=["sample", "label"],
+                                           reader_name="Reader",
+                                           auto_reset=True,
+                                           last_batch_policy=)
         return train_loader
 
     @staticmethod
@@ -109,6 +112,9 @@ class ImageNet:
                                  crop=args.image_size,
                                  size=int(args.image_size/0.875))
         val_pipe.build()
-        val_loader = DALIClassificationIterator([val_pipe],
+        val_loader = DALIGenericIterator([val_pipe],
                                                 val_pipe.epoch_size("Reader") / world_size())
         return val_loader
+
+def build_imagenet_loader(args):
+    return ImageNet.build_train_loader(args), ImageNet.build_val_loader(args)

@@ -1,15 +1,26 @@
-from functools import wraps
-import inspect
 import os
-
-import torch
-
 import typing
 
+import torch
 import torch.distributed as dist
 
+def patch_OpenPAI_env():
+    DISTRIBUTED_SYNC_PORT = "distributed_sync_port" # !!! assume the port label for distributed sync is "distributed_sync_port"
+    if "PAI_USER_NAME" in os.environ:
+        # env "PAI_USER_NAME" exists, that means the job is run by OpenPAI
+        # here we copy some essential env variables from OpenPAI preprocessing script
+        taskrole = os.environ["PAI_CURRENT_TASK_ROLE_NAME"]
+        n_instances = int(os.environ[f"PAI_TASK_ROLE_TASK_COUNT_{taskrole}"])
+        if n_instances > 1: # running with distributed mode in OpenPAI
+            # refer to 'https://openpai.readthedocs.io/en/latest/manual/cluster-user/how-to-use-advanced-job-settings.html#environmental-variables-and-port-reservation'
+            os.environ['WORLD_SIZE'] = os.environ[f"PAI_TASK_ROLE_TASK_COUNT_{taskrole}"]
+            os.environ['MASTER_ADDR'] = os.environ[f'PAI_HOST_IP_{taskrole}_0']
+            os.environ['MASTER_PORT'] = os.environ[f'PAI_{taskrole}_0_{DISTRIBUTED_SYNC_PORT}_PORT']
+            os.environ["RANK"] = os.environ["PAI_CURRENT_TASK_ROLE_CURRENT_TASK_INDEX"]
+            os.environ["LOCAL_RANK"] = str(0)
 
 def init(backend="nccl", init_method="env://"):
+    patch_OpenPAI_env()
     if "RANK" in os.environ and "WORLD_SIZE" in os.environ:
         if dist.is_available():
             rank = int(os.environ["RANK"])
@@ -53,62 +64,6 @@ def is_master():
     return rank() == 0
 
 
-def torchsave(*args, **kwargs):
+def torchsave(obj, f):
     if is_master():
-        torch.save(*args, **kwargs)
-
-
-def dummy_func(*args, **kargs):
-    pass
-
-
-class DummyClass():
-    def __getattribute__(self, obj):
-        return dummy_func
-
-
-class FakeObj:
-    def __getattr__(self, name):
-        return do_nothing
-
-
-def do_nothing(*args, **kwargs) -> FakeObj:
-    return FakeObj()
-
-
-def only_master_fn(fn):
-    @wraps(fn)
-    def wrapper(*args, **kwargs):
-        if is_master() or kwargs.get('run_anyway', False):
-            kwargs.pop('run_anyway', None)
-            return fn(*args, **kwargs)
-        else:
-            return FakeObj()
-
-    return wrapper
-
-
-def only_master_cls(cls):
-    for key, value in cls.__dict__.items():
-        if callable(value):
-            setattr(cls, key, only_master_fn(value))
-
-    return cls
-
-
-def only_master_obj(obj):
-    cls = obj.__class__
-    for key, value in cls.__dict__.items():
-        if callable(value):
-            obj.__dict__[key] = only_master_fn(value).__get__(obj, cls)
-
-    return obj
-
-
-def only_master(something):
-    if inspect.isfunction(something):
-        return only_master_fn(something)
-    elif inspect.isclass(something):
-        return only_master_cls(something)
-    else:
-        return only_master_obj(something)
+        torch.save(obj, f)
