@@ -7,10 +7,11 @@ from torch.cuda.amp import autocast, GradScaler
 import logging
 import enum
 import functools
-import torchutils
-from torchutils.distributed import world_size
-from torchutils.metrics import AccuracyMetric, AverageMetric, EstimatedTimeArrival
-from torchutils import logger
+import codebase.torchutils
+from codebase.torchutils.distributed import world_size
+from codebase.torchutils.metrics import AccuracyMetric, AverageMetric, EstimatedTimeArrival
+from codebase.torchutils import logger
+
 
 def fetch(datas):
     if isinstance(datas[0], dict):
@@ -21,7 +22,9 @@ def fetch(datas):
     images, targets = images.cuda(non_blocking=True), targets.cuda(non_blocking=True)
     return images, targets
 
+
 scaler = GradScaler()
+
 
 class SpeedTester():
     def __init__(self):

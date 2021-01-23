@@ -12,11 +12,10 @@ from torchutils.common import set_cudnn_auto_tune
 from codebase.config import args
 from codebase.scheduler import build_scheduler
 from codebase.optimizer import build_optimizer
-from codebase.criterion import build_criterion
+from codebase.criterion import CRITERION
 from codebase.dataset import build_imagenet_loader
 from codebase.models import build_model
 from codebase.engine import train, evaluate
-
 
 
 if __name__ == "__main__":
@@ -27,11 +26,11 @@ if __name__ == "__main__":
 
     model: nn.Module = build_model(args)
     torchutils.logger.info(f"Model details: n_params={compute_nparam(model)/1e6:.2f}M, "
-                      f"flops={compute_flops(model,(1,3,args.image_size, args.image_size))/1e6:.2f}M.")
+                           f"flops={compute_flops(model,(1,3,args.image_size, args.image_size))/1e6:.2f}M.")
 
     train_loader, val_loader = build_imagenet_loader(args)
 
-    criterion = build_criterion(args)
+    criterion = CRITERION.build_from(args)
     optimizer: optim.Optimizer = build_optimizer(model.parameters(), args)
     scheduler = build_scheduler(optimizer, args)
 
@@ -64,7 +63,7 @@ if __name__ == "__main__":
         for func, loader in zip((train, evaluate), (train_loader, val_loader)):
             name = func.__name__.upper()
             loss, (top1_accuracy, top5_accuracy) = func(epoch, model, loader, criterion,
-                                                        optimizer, scheduler, args.report_freq)
+                                                        optimizer, scheduler, args.amp, args.report_freq)
             torchutils.summary_writer.add_scalar(f"{name}/loss", loss, epoch)
             torchutils.summary_writer.add_scalar(f"{name}/acc_1", top1_accuracy, epoch)
             torchutils.summary_writer.add_scalar(f"{name}/acc_5", top5_accuracy, epoch)
