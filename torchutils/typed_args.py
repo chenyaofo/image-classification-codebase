@@ -1,5 +1,5 @@
 '''
-Modified from https://github.com/SunDoge/typed-args/tree/v0.4
+Modified from https://github.com/SunDoge/typed-args
 
 BSD 3-Clause License
 
@@ -37,7 +37,8 @@ import collections
 import logging
 from argparse import ArgumentParser, Namespace
 from dataclasses import dataclass
-from typing import Union, Optional, Any, Iterable, List, Tuple
+from pprint import pformat
+from typing import Any, Iterable, List, Optional, Tuple, TypeVar, Union
 
 try:
     # Python 3.8
@@ -57,8 +58,8 @@ except ImportError:
         """
         if isinstance(tp, typing._GenericAlias):
             return tp.__origin__
-        if tp is typing.Generic:
-            return typing.Generic
+        if tp is typing.Generic:  # type: ignore
+            return typing.Generic  # type: ignore
         return None
 
     def get_args(tp):
@@ -78,22 +79,27 @@ except ImportError:
             return res
         return ()
 
-__version__ = '0.4.0'
+__version__ = '0.4.3'
+
+logger = logging.getLogger(__name__)
+
+T = TypeVar('T')
 
 
 @dataclass
 class TypedArgs:
+    # parser: ArgumentParser = field(default_factory=ArgumentParser)
 
     @classmethod
-    def from_args(cls, args: Optional[List[str]] = None, namespace: Optional[Namespace] = None):
-        typed_args = cls()
+    def from_args(cls: T, args: Optional[List[str]] = None, namespace: Optional[Namespace] = None) -> T:
+        typed_args: TypedArgs = cls()
         typed_args._parse_args(typed_args.parser_factory(),
                                args=args, namespace=namespace)
         return typed_args
 
     @classmethod
-    def from_known_args(cls, args: Optional[List[str]] = None, namespace: Optional[Namespace] = None):
-        typed_args = cls()
+    def from_known_args(cls: T, args: Optional[List[str]] = None, namespace: Optional[Namespace] = None) -> Tuple[T, List[str]]:
+        typed_args: TypedArgs = cls()
         args = typed_args._parse_known_args(
             typed_args.parser_factory(), args=args, namespace=namespace)
         return typed_args, args
@@ -103,6 +109,9 @@ class TypedArgs:
 
     def _add_arguments(self, parser: ArgumentParser):
         for name, annotation in self.__dataclass_fields__.items():
+            # There's no parser on self
+            # if name == 'parser':
+            #     continue
             self._add_argument(parser, name, annotation.type)
 
     def _add_argument(self, parser: ArgumentParser, name: str, annotation: Any):
@@ -116,11 +125,14 @@ class TypedArgs:
             """
             List[Union[str, int]]
             """
+            # types = annotation.__args__[0].__args__
             types = get_inner_types(annotation)
+            # List[int, ...]
             if types[-1] == Ellipsis:
                 types = (types[0],) * len(values)
 
         for argument_type, value in zip(types, values):
+            # 如果不适用add_argument，则不parse
             if not isinstance(value, PhantomAction):
                 continue
 
@@ -138,9 +150,14 @@ class TypedArgs:
             origin = get_origin(argument_type)
 
             if origin is list:
+                # We want inner type
                 argument_type = get_args(argument_type)[0]
 
+                # print('argument type: ', argument_type)
+
             if kwargs['action'] == 'store':
+
+                # 不存在default的才需要判断optional
                 if kwargs.get('default') is None:
 
                     if origin is Union:  # Optional
@@ -163,7 +180,7 @@ class TypedArgs:
         self._update_arguments(parsed_args)
 
     def _parse_known_args(self, parser: ArgumentParser, args: Optional[List[str]] = None,
-                          namespace: Optional[Namespace] = None):
+                          namespace: Optional[Namespace] = None) -> List[str]:
         self._add_arguments(parser)
         parsed_args, args = parser.parse_known_args(
             args=args, namespace=namespace)
@@ -171,9 +188,18 @@ class TypedArgs:
         return args
 
     def _update_arguments(self, parsed_args: Namespace):
+        # for name in self.__dataclass_fields__.keys():
+        #     # if name == 'parser':
+        #     #     continue
+        #     value = getattr(parsed_args, name)
+        #     setattr(self, name, value)
 
         for name, value in parsed_args.__dict__.items():
             setattr(self, name, value)
+
+    def __repr__(self) -> str:
+        body = pformat(self.__dict__)
+        return f'{self.__class__.__qualname__}{body}'
 
 
 def get_inner_types(annotation):
@@ -260,8 +286,9 @@ def add_argument(
         required: Optional[bool] = None,
         help: Optional[str] = None,
         metavar: Optional[str] = None,
-):
+) -> Any:
     """
+
     :param option_strings:
     :param action:
     :param nargs:
@@ -274,4 +301,10 @@ def add_argument(
     :return:
     """
     kwargs = locals()
+    logger.debug('local = ', kwargs)
+
+    # print('=' * 100)
+    # print(kwargs)
+    # print('=' * 100)
+
     return PhantomAction(**kwargs)

@@ -1,13 +1,16 @@
 import os
 import sys
+import time
 import typing
 import logging
-import argparse
+import uuid
 import glob
 import zipfile
 
-from .distributed import is_master
+from torch.utils.collect_env import get_pretty_env_info
 
+from .distributed import is_master
+from .common import get_branch_name, get_last_commit_id
 
 T = typing.TypeVar("T")
 
@@ -54,3 +57,18 @@ def create_code_snapshot(name: str,
         for suffix in include_suffix:
             for file in glob.glob(os.path.join(source_directory, "**", "*{}".format(suffix)), recursive=True):
                 f.write(file, os.path.join(name, file))
+
+def get_diagnostic_info():
+    diagnostic_info = f"Log Time: {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())}\n"
+    diagnostic_info += f"UUID: {uuid.uuid1()}\n"
+    diagnostic_info += f"Argv: {' '.join(sys.argv)}\n"
+    diagnostic_info += f"Git Branch: {get_branch_name()}\n"
+    diagnostic_info += f"Git Commit ID: {get_last_commit_id()}\n\n"
+
+    diagnostic_info += f"More Diagnostic Info: \n"
+    diagnostic_info += "-" * 50 + "\n"
+    diagnostic_info += get_pretty_env_info() + "\n"
+    diagnostic_info += "-" * 50 + "\n"
+    
+
+    return diagnostic_info

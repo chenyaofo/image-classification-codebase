@@ -119,7 +119,7 @@ class ConfusionMatrix(object):
 
     def _reset_buffer(self):
         self._matrix_since_last_sync = torch.zeros(size=(self.num_classes,)*2,
-                                  dtype=torch.int64, device="cuda")
+                                                   dtype=torch.int64, device="cuda")
         self._is_synced = True
 
     def update(self, targets, predictions):
@@ -141,18 +141,17 @@ class ConfusionMatrix(object):
         self.sync()
         m = self.matrix.float()
         return (m.diag().sum()/(m.sum()+EPSILON)).item()
-    
+
     def mean_pixel_accuracy(self):
         self.sync()
         m = self.matrix.float()
         return (m.diag()/m.sum(dim=1)).mean().item()
-    
+
     def mean_intersection_over_union(self):
         self.sync()
         m = self.matrix.float()
         diag = m.diag()
         return (diag/(m.sum(dim=0)+m.sum(dim=1)-diag+EPSILON)).mean().item()
-
 
 
 class AverageMetric(object):
@@ -195,6 +194,25 @@ class AverageMetric(object):
     def compute(self) -> float:
         self.sync()
         return self._value / (self._n+EPSILON)
+
+
+class GroupMetric(object):
+    def __init__(self, n, metric_cls):
+        self.metrics = [metric_cls() for _ in range(n)]
+
+    def reset(self):
+        for m in self.metrics:
+            m.reset()
+
+    def update(self, values):
+        for m, v in zip(self.metrics, values):
+            if isinstance(v, (list, tuple)):
+                m.update(*v)
+            else:
+                m.update(v)
+
+    def compute(self):
+        return [m.compute() for m in self.metrics]
 
 
 class EstimatedTimeArrival(object):
