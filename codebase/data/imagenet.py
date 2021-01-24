@@ -19,8 +19,16 @@ except ImportError:
 
 from torchutils.distributed import world_size, local_rank
 
-IMAGENET_MEAN = [0.485*255, 0.456*255, 0.406*255]
-IMAGENET_STD = [0.229*255, 0.224*255, 0.225*255]
+IMAGENET_MEAN = [0.485*255., 0.456*255., 0.406*255.]
+IMAGENET_STD = [0.229*255., 0.224*255., 0.225*255.]
+
+
+class ImageNet:
+    NUM_CLASSES = 1000
+    MEAN = [0.485, 0.456, 0.406]
+    MEAN_255 = [0.485*255., 0.456*255., 0.406*255.]
+    STD = [0.229, 0.224, 0.225]
+    STD_255 = [0.229*255., 0.224*255., 0.225*255.]
 
 
 class HybridTrainPipe(Pipeline):
@@ -90,6 +98,7 @@ class HybridValPipe(Pipeline):
 
 class ImageNet:
     NUM_CLASS = 1000
+
     @staticmethod
     def build_train_loader(args):
         train_pipe = HybridTrainPipe(batch_size=args.batch_size,
@@ -113,8 +122,9 @@ class ImageNet:
                                  size=int(args.image_size/0.875))
         val_pipe.build()
         val_loader = DALIGenericIterator([val_pipe],
-                                                val_pipe.epoch_size("Reader") / world_size())
+                                         val_pipe.epoch_size("Reader") / world_size())
         return val_loader
+
 
 def build_imagenet_loader(args):
     return ImageNet.build_train_loader(args), ImageNet.build_val_loader(args)

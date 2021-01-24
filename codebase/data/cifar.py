@@ -20,15 +20,24 @@ import numpy
 CIFAR10_MEAN = [0.49139968 * 255., 0.48215827 * 255., 0.44653124 * 255.]
 CIFAR10_STD = [0.24703233 * 255., 0.24348505 * 255., 0.26158768 * 255.]
 
+
+class CIFAR10:
+    NUM_CLASSES = 10
+    MEAN = [0.49139968, 0.48215827, 0.44653124]
+    MEAN_255 = [0.49139968 * 255., 0.48215827 * 255., 0.44653124 * 255.]
+    STD = [0.24703233, 0.24348505, 0.26158768]
+    STD_255 = [0.24703233 * 255., 0.24348505 * 255., 0.26158768 * 255.]
+
+
 class CIFARExternalSource(object):
-    def __init__(self, dataset:Dataset, batch_size:int, shuffle:bool=None):
+    def __init__(self, dataset: Dataset, batch_size: int, shuffle: bool = None):
         self.batch_size = batch_size
 
         self.datas = [torch.tensor(item) for item in dataset.data]
         self.targets = [torch.tensor(item) for item in dataset.targets]
 
         self.shuffle = dataset.train if shuffle is None else shuffle
-    
+
     def __iter__(self):
         self.i = 0
         self.n = len(self.datas)
@@ -46,11 +55,12 @@ class CIFARExternalSource(object):
             self.i = (self.i + 1) % self.n
         return (batch, labels)
 
+
 class HybridTrainPipe_CIFAR(Pipeline):
-    def __init__(self, cifar_dataset, batch_size, num_threads, crop=16, device_id=local_rank(),cpu_only=False, local_rank=0,
+    def __init__(self, cifar_dataset, batch_size, num_threads, crop=16, device_id=local_rank(), cpu_only=False, local_rank=0,
                  world_size=1,
                  cutout=0):
-        
+
         super(HybridTrainPipe_CIFAR, self).__init__(batch_size, num_threads, device_id, seed=12 + device_id)
 
         dali_device = 'cpu' if cpu_only else 'gpu'
