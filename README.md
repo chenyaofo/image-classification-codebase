@@ -33,6 +33,8 @@ Note that this project **does not aim** to offer any pretrained models.
   - AMP support.
   - Auto recomputation support.
   - Auto resume from checkpoint.
+  - AutoAugment and RandAugment support.
+  - ZeRO-Offload sopport?
   - Other tricks.
 
 ## Cite
