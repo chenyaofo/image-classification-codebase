@@ -23,19 +23,22 @@ You can use multiple GPUs to accelerate the training with distributed data paral
 **Single node, multiple GPUs:**
 
 ```bash
-CUDA_VISIBLE_DEVICES=0,1 python -m entry.run --world-size 2 --conf conf/cifar.conf -o output/cifar_resnet20
+CUDA_VISIBLE_DEVICES=0,1 python -m entry.run --world-size 2 \
+--conf conf/cifar.conf -o output/cifar_resnet20
 ```
 
 **Multiple nodes:**
 
 Node 0:
 ```bash
-CUDA_VISIBLE_DEVICES=0,1 python -m entry.run --world-size 4 --dist-url 'tcp://IP_OF_NODE0:FREEPORT' --node-rank 0 --conf conf/cifar.conf -o output/cifar_resnet20
+CUDA_VISIBLE_DEVICES=0,1 python -m entry.run --world-size 4 --dist-url \
+'tcp://IP_OF_NODE0:FREEPORT' --node-rank 0 --conf conf/cifar.conf -o output/cifar_resnet20
 ```
 
 Node 1:
 ```bash
-CUDA_VISIBLE_DEVICES=0,1 python -m entry.run --world-size 4 --dist-url 'tcp://IP_OF_NODE0:FREEPORT' --node-rank 1 --conf conf/cifar.conf -o output/cifar_resnet20
+CUDA_VISIBLE_DEVICES=0,1 python -m entry.run --world-size 4 --dist-url \
+'tcp://IP_OF_NODE0:FREEPORT' --node-rank 1 --conf conf/cifar.conf -o output/cifar_resnet20
 ```
 
 
