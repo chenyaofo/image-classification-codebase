@@ -38,7 +38,7 @@ CUDA_VISIBLE_DEVICES=0,1 python -m entry.run --world-size 4 --dist-url \
 Node 1:
 ```bash
 CUDA_VISIBLE_DEVICES=0,1 python -m entry.run --world-size 4 --dist-url \
-'tcp://IP_OF_NODE0:FREEPORT' --node-rank 1 --conf conf/cifar.conf -o output/cifar_resnet20
+'tcp://IP_OF_NODE1:FREEPORT' --node-rank 1 --conf conf/cifar.conf -o output/cifar_resnet20
 ```
 
 
