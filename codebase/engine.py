@@ -86,13 +86,13 @@ def train(epoch, model, loader, critirion, optimizer, scheduler,
         ETA.step()
         speed_tester.update(inputs)
 
-        if iter_ % log_interval == 0 or iter_ == len(loader)-1:
+        if iter_ % log_interval == 0 or iter_ == len(loader):
             _logger.info(", ".join([
                 "TRAIN",
                 f"epoch={epoch:04d}",
                 f"iter={iter_:05d}/{len(loader):05d}",
                 f"fetch data time cost={time_cost*1000:.2f}ms",
-                f"fps={speed_tester.compute()*world_size():.2f} images/s",
+                f"fps={speed_tester.compute()*world_size():.0f} images/s",
                 f"{loss_metric}",
                 f"{accuracy_metric}",
                 f"{ETA}",
@@ -129,13 +129,13 @@ def evaluate(epoch, model, loader, critirion, device, log_interval):
         ETA.step()
         speed_tester.update(inputs)
 
-        if iter_ % log_interval == 0 or iter_ == len(loader)-1:
+        if iter_ % log_interval == 0 or iter_ == len(loader):
             _logger.info(", ".join([
                 "EVAL",
                 f"epoch={epoch:04d}",
                 f"iter={iter_:05d}/{len(loader):05d}",
                 f"fetch data time cost={time_cost*1000:.2f}ms",
-                f"fps={speed_tester.compute()*world_size():.2f} images/s",
+                f"fps={speed_tester.compute()*world_size():.0f} images/s",
                 f"{loss_metric}",
                 f"{accuracy_metric}",
                 f"{ETA}",

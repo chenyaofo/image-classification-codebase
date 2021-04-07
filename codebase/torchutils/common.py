@@ -347,3 +347,13 @@ class MetricsList(collections.defaultdict):
 
     def as_plain_dict(self):
         return {k: v for k, v in self.items()}
+
+
+def find_best_metric(metrics, larger_is_better=True):
+    best_index, best_metric = 0, metrics[0]
+    for i, metric in enumerate(metrics):
+        if (larger_is_better and metric > best_metric) or \
+                (not larger_is_better and metric < best_metric):
+            best_metric = metric
+            best_index = i
+    return best_index, best_metric

@@ -33,10 +33,12 @@ def cifar10(root, mean, std, batch_size, num_workers, **kwargs):
     train_loader = data.DataLoader(trainset, batch_size=batch_size,
                                    shuffle=(train_sampler is None),
                                    sampler=train_sampler,
-                                   num_workers=num_workers)
+                                   num_workers=num_workers,
+                                   persistent_workers=True)
     val_loader = data.DataLoader(valset, batch_size=batch_size,
                                  shuffle=(val_sampler is None),
                                  sampler=val_sampler,
-                                 num_workers=num_workers)
+                                 num_workers=num_workers,
+                                 persistent_workers=True)
 
     return train_loader, val_loader
