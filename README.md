@@ -3,33 +3,50 @@
 This project **aims** to provide a codebase for the image classification task implemented by PyTorch.
 It does not use any high-level deep learning libraries (such as pytorch-lightening or MMClassification).
 Thus, it should be easy to follow and modified.
-Note that this project **does not aim** to offer any pretrained models.
 
 ## Requirements
 
- - Python 3.7+
- - PyTorch 1.4+
- - Torchvision
- - DALI 0.28+ (Optional)
+The code is tested on `python==3.9, pyhocon==0.3.57, torch=1.8.0, torchvision=0.9.0`
 
 ## Get Started
 
-### Basic Usage
+You can get started with a resnet20 convolution network on cifar10 with the following command.
 
-### Finetune with Existing Model
+**Single node, single GPU:**
 
-### Train with Custom Model
+```bash
+CUDA_VISIBLE_DEVICES=0 python -m entry.run --conf conf/cifar.conf -o output/cifar_resnet20
+```
 
-### Train with Custom Dataset
+You can use multiple GPUs to accelerate the training with distributed data parallel:
+
+**Single node, multiple GPUs:**
+
+```bash
+CUDA_VISIBLE_DEVICES=0,1 python -m entry.run --world-size 2 --conf conf/cifar.conf -o output/cifar_resnet20
+```
+
+**Multiple nodes:**
+
+Node 0:
+```bash
+CUDA_VISIBLE_DEVICES=0,1 python -m entry.run --world-size 4 --dist-url 'tcp://IP_OF_NODE0:FREEPORT' --node-rank 0 --conf conf/cifar.conf -o output/cifar_resnet20
+```
+
+Node 1:
+```bash
+CUDA_VISIBLE_DEVICES=0,1 python -m entry.run --world-size 4 --dist-url 'tcp://IP_OF_NODE0:FREEPORT' --node-rank 1 --conf conf/cifar.conf -o output/cifar_resnet20
+```
 
 
-## Features
+## Highlights
 
  - Distributed training support (Use native Pytorch API).
  - DALI data processing support.
 
 ## Roadmap
   
+  - Prefetch Dataloader
   - AMP support.
   - Auto recomputation support.
   - Auto resume from checkpoint.
@@ -43,7 +60,7 @@ Note that this project **does not aim** to offer any pretrained models.
 @misc{chen2020image,
   author = {Yaofo Chen},
   title = {Image Classification Codebase},
-  year = {2020},
+  year = {2021},
   publisher = {GitHub},
   journal = {GitHub repository},
   howpublished = {\url{https://github.com/chenyaofo/image-classification-codebase}}
@@ -51,3 +68,5 @@ Note that this project **does not aim** to offer any pretrained models.
 ```
 
 ## License
+
+MIT License

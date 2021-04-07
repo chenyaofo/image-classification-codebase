@@ -25,6 +25,7 @@ from codebase.torchutils.common import ModelSaver
 from codebase.torchutils.common import MetricsList
 from codebase.torchutils.common import patch_download_in_cn
 from codebase.torchutils.common import DummyClass
+from codebase.torchutils.common import find_best_metric
 from codebase.torchutils.distributed import is_dist_avail_and_init, is_master
 from codebase.torchutils.metrics import EstimatedTimeArrival
 from codebase.torchutils.logging_ import init_logger
@@ -36,7 +37,6 @@ _logger = logging.getLogger(__name__)
 def main(args: Args):
     distributed = args.world_size > 1
     ngpus_per_node = torch.cuda.device_count()
-    print(ngpus_per_node)
     if distributed:
         mp.spawn(main_worker, nprocs=ngpus_per_node, args=(ngpus_per_node, args, args.conf))
     else:
@@ -45,17 +45,18 @@ def main(args: Args):
 
 
 def main_worker(local_rank, ngpus_per_node, args: Args, conf: ConfigTree):
-    print("enter main worker")
-    
+    if torch.cuda.is_available:
+        torch.cuda.set_device(local_rank)
+        device = torch.cuda.current_device()
+    else:
+        device = "cpu"
+
     rank = args.node_rank*ngpus_per_node+local_rank
-    print(f"{rank=}, {local_rank=}")
     init_logger(rank=rank, filenmae=args.output_dir/"default.log")
     writer = SummaryWriter(args.output_dir) if is_master() else DummyClass()
 
     _logger.info("Collect envs from system:\n" + get_pretty_env_info())
     _logger.info("Args:\n" + pprint.pformat(dataclasses.asdict(args)))
-
-    device = f"cuda:{local_rank}" if torch.cuda.is_available() else "cpu"
 
     if args.world_size > 1:
         dist.init_process_group(backend=args.dist_backend, init_method=args.dist_url,
@@ -93,10 +94,8 @@ def main_worker(local_rank, ngpus_per_node, args: Args, conf: ConfigTree):
     else:
         start_epoch = 0
 
-    print("before DistributedDataParallel")
     if is_dist_avail_and_init():
         model = nn.parallel.DistributedDataParallel(model, device_ids=[local_rank])
-    print("after DistributedDataParallel")
     use_amp = conf.get_bool("use_amp")
     log_interval = conf.get_int("log_interval")
 
@@ -114,7 +113,8 @@ def main_worker(local_rank, ngpus_per_node, args: Args, conf: ConfigTree):
 
             saver.save(minitor=minitor_metric, metrics=metrics.as_plain_dict(), states=states)
             ETA.step()
-            _logger.info(f"Epoch={epoch:04d} complete, {ETA}")
+            best_epoch, best_acc = find_best_metric(metrics[minitor_metric])
+            _logger.info(f"Epoch={epoch:04d} complete, best val acc={best_acc*100:.2f}%@{best_epoch}epoch {ETA}")
 
 
 if __name__ == "__main__":
