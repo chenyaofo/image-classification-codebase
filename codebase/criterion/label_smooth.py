@@ -3,9 +3,10 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.nn.modules.loss import _WeightedLoss
 
-# from ..register import LOSS
+from .register import CRITERION
 
-# @LOSS.register
+
+@CRITERION.register
 class LabelSmoothCrossEntropyLoss(_WeightedLoss):
     def __init__(self, num_classes, epsilon=0.1, weight=None, size_average=None,
                  reduce=None, reduction='mean'):
@@ -30,4 +31,3 @@ class LabelSmoothCrossEntropyLoss(_WeightedLoss):
             return losses.mean()
         else:
             raise ValueError(f"The parameter 'reduction' must be in ['none','mean','sum'], bot got {self.redcution}")
-        

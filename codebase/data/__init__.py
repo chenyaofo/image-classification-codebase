@@ -1,1 +1,3 @@
-from .imagenet import build_imagenet_loader
+from .register import DATA
+
+from .cifar import cifar10
