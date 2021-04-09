@@ -62,7 +62,8 @@ def train(epoch, model, loader, critirion, optimizer, scheduler,
     ETA = EstimatedTimeArrival(len(loader))
     speed_tester = SpeedTester()
 
-    _logger.info(f"Train start, epoch={epoch:04d}, lr={optimizer.param_groups[0]['lr']:.6f}")
+    lr = optimizer.param_groups[0]['lr']
+    _logger.info(f"Train start, epoch={epoch:04d}, lr={lr:.6f}")
 
     for time_cost, iter_, (inputs, targets) in time_enumerate(loader, start=1):
         inputs, targets = inputs.to(device=device), targets.to(device=device)
@@ -103,6 +104,7 @@ def train(epoch, model, loader, critirion, optimizer, scheduler,
         scheduler.step()
 
     return {
+        "lr": lr,
         "train/loss": loss_metric.compute(),
         "train/top1_acc": accuracy_metric.at(1).rate,
         "train/top5_acc": accuracy_metric.at(5).rate,
