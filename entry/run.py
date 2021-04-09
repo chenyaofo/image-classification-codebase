@@ -100,7 +100,9 @@ def main_worker(local_rank, ngpus_per_node, args: Args, conf: ConfigTree):
     log_interval = conf.get_int("log_interval")
 
     if conf.get_bool("only_evaluate"):
-        metrics += evaluate(0, model, val_loader, criterion, device, log_interval)
+        val_metrics = evaluate(0, model, val_loader, criterion, device, log_interval)
+        _logger.info(f"EVAL complete, top1-acc={val_metrics['val/top1_acc']*100:.2f}%, " +
+                     f"top5-acc={val_metrics['val/top5_acc']*100:.2f}%")
     else:
         ETA = EstimatedTimeArrival(max_epochs)
         for epoch in range(start_epoch+1, max_epochs+1):
