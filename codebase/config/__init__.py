@@ -35,8 +35,11 @@ def get_args():
     if args.modifications is not None:
         for modifition in args.modifications:
             key, value = modifition.split("=")
-            value = eval(value)
+            try:
+                eval_value = eval(value)
+            except Exception:
+                eval_value = value
             if key not in args.conf:
                 raise ValueError(f"Key '{key}'' is not in the config tree!")
-            args.conf.put(key, value)
+            args.conf.put(key, eval_value)
     return args
