@@ -42,20 +42,29 @@ CUDA_VISIBLE_DEVICES=0,1 python -m entry.run --world-size 4 --dist-url \
 ```
 
 
-## Highlights
+## Features
 
- - Distributed training support (Use native Pytorch API).
- - DALI data processing support.
+This codebase adopt configuration file (`.hocon`) to store the hyperparameters (such as the learning rate, training epochs and etc.).
+If you want to modify the configuration hyperparameters, you have two ways:
 
-## Roadmap
-  
-  - Prefetch Dataloader
-  - AMP support.
-  - Auto recomputation support.
-  - Auto resume from checkpoint.
-  - AutoAugment and RandAugment support.
-  - ZeRO-Offload sopport?
-  - Other tricks.
+1. Modify the configuration file to generate a new file.
+
+2. You can add `-M` in the running command line to modify the hyperparameters temporarily.
+
+
+For example, if you hope to modify the total training epochs to 100 and the learning rate to 0.05. You can run the following command:
+
+```bash
+CUDA_VISIBLE_DEVICES=0 python -m entry.run --conf conf/cifar.conf -o output/cifar_resnet20 -M 'max_epochs=100' 'optimizer.lr=0.05'
+```
+
+If you modify a non existing hyperparameter, the code will raise an exception.
+
+To list all valid hyperparameters names, you can run the following command:
+
+```bash
+pyhocon -i conf/cifar.conf -f properties
+```
 
 ## Cite
 
