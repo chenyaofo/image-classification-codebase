@@ -1,4 +1,6 @@
 import os
+import pathlib
+import shutil
 import typing
 
 import torch
@@ -108,4 +110,7 @@ def torchsave(obj: typing.Any, f: str) -> None:
         f (str): The output file path.
     """
     if is_master():
-        torch.save(obj, f)
+        f: pathlib.Path = pathlib.Path(f)
+        tmp_name = f.with_name("tmp.pt")
+        torch.save(obj, tmp_name)
+        shutil.move(tmp_name, f)
