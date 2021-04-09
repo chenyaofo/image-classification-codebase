@@ -12,9 +12,6 @@ _str_2_reduceop = dict(
     product=dist.ReduceOp.PRODUCT,
     min=dist.ReduceOp.MIN,
     max=dist.ReduceOp.MAX,
-    # band=dist.ReduceOp.BAND,
-    # bor=dist.ReduceOp.BOR,
-    # bxor=dist.ReduceOp.BXOR,
 )
 
 
