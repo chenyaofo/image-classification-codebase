@@ -1,4 +1,3 @@
-import time
 import logging
 
 import torch
@@ -6,56 +5,17 @@ from torch.cuda.amp import autocast, GradScaler
 
 from codebase.torchutils.distributed import world_size
 from codebase.torchutils.metrics import AccuracyMetric, AverageMetric, EstimatedTimeArrival
-
+from codebase.torchutils.common import SpeedTester, time_enumerate
 
 _logger = logging.getLogger(__name__)
-
-
-scaler = GradScaler()
-
-
-class SpeedTester():
-    def __init__(self):
-        self.reset()
-
-    def reset(self):
-        self.batch_size = 0
-        self.start = time.perf_counter()
-
-    def update(self, tensor):
-        batch_size, *_ = tensor.shape
-        self.batch_size += batch_size
-        self.end = time.perf_counter()
-
-    def compute(self):
-        if self.batch_size == 0:
-            return 0
-        else:
-            return self.batch_size/(self.end-self.start)
-
-
-class time_enumerate:
-    def __init__(self, seq, start=0):
-        self.seq = seq
-        self.start = start
-        self.counter = self.start-1
-
-    def __iter__(self):
-        self.seq_iter = iter(self.seq)
-        return self
-
-    def __next__(self):
-        while True:
-            start_time = time.perf_counter()
-            item = next(self.seq_iter)
-            end_time = time.perf_counter()
-            self.counter += 1
-            return end_time-start_time, self.counter, item
 
 
 def train(epoch, model, loader, critirion, optimizer, scheduler,
           use_amp, device, log_interval):
     model.train()
+
+    if use_amp:
+        scaler = GradScaler()
 
     loss_metric = AverageMetric("loss")
     accuracy_metric = AccuracyMetric(topk=(1, 5))
