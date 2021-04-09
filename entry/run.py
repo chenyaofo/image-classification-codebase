@@ -45,7 +45,7 @@ def main(args: Args):
 
 
 def main_worker(local_rank, ngpus_per_node, args: Args, conf: ConfigTree):
-    if torch.cuda.is_available:
+    if torch.cuda.is_available():
         torch.cuda.set_device(local_rank)
         device = torch.cuda.current_device()
     else:
