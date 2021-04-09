@@ -79,7 +79,7 @@ def main_worker(local_rank, ngpus_per_node, args: Args, conf: ConfigTree):
     metrics = MetricsList()
 
     minitor_metric = "val/top1_acc"
-    states = dict(model=unwarp_module(model), optimizer=optimizer)
+    states = dict(model=unwarp_module(model), optimizer=optimizer, scheduler=scheduler)
 
     if torch.cuda.is_available():
         model = model.to(device=device)
@@ -114,7 +114,7 @@ def main_worker(local_rank, ngpus_per_node, args: Args, conf: ConfigTree):
             saver.save(minitor=minitor_metric, metrics=metrics.as_plain_dict(), states=states)
             ETA.step()
             best_epoch, best_acc = find_best_metric(metrics[minitor_metric])
-            _logger.info(f"Epoch={epoch:04d} complete, best val acc={best_acc*100:.2f}%@{best_epoch}epoch {ETA}")
+            _logger.info(f"Epoch={epoch:04d} complete, best val acc={best_acc*100:.2f}% @ {best_epoch} epoch {ETA}")
 
 
 if __name__ == "__main__":
