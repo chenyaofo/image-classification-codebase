@@ -116,8 +116,11 @@ def main_worker(local_rank, ngpus_per_node, args: Args, conf: ConfigTree):
 
             saver.save(minitor=minitor_metric, metrics=metrics.as_plain_dict(), states=states)
             ETA.step()
-            best_epoch, best_acc = find_best_metric(metrics[minitor_metric])
-            _logger.info(f"Epoch={epoch:04d} complete, best val acc={best_acc*100:.2f}% @ {best_epoch} epoch, {ETA}")
+            best_epoch_index, _ = find_best_metric(metrics[minitor_metric])
+            best_top1acc = metrics["val/top1_acc"][best_epoch_index]
+            best_top5acc = metrics["val/top5_acc"][best_epoch_index]
+            _logger.info(f"Epoch={epoch:04d} complete, best val top1-acc={best_top1acc*100:.2f}%, "
+                         f"top5-acc={best_top5acc*100:.2f}% (epoch={best_epoch_index+1}), {ETA}")
 
 
 if __name__ == "__main__":
