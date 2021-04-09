@@ -55,8 +55,9 @@ def main_worker(local_rank, ngpus_per_node, args: Args, conf: ConfigTree):
     init_logger(rank=rank, filenmae=args.output_dir/"default.log")
     writer = SummaryWriter(args.output_dir) if is_master() else DummyClass()
 
-    _logger.info("Collect envs from system:\n" + get_pretty_env_info())
-    _logger.info("Args:\n" + pprint.pformat(dataclasses.asdict(args)))
+    if not conf.get_bool("only_evaluate"):
+        _logger.info("Collect envs from system:\n" + get_pretty_env_info())
+        _logger.info("Args:\n" + pprint.pformat(dataclasses.asdict(args)))
 
     if args.world_size > 1:
         dist.init_process_group(backend=args.dist_backend, init_method=args.dist_url,
