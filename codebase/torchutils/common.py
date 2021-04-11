@@ -331,7 +331,8 @@ class ModelSaver:
     def restore(self, metrics: dict, states: dict, device="cuda:0"):
         checkpoint_path = self.output_directory / "checkpoint.pt"
         if checkpoint_path.exists():
-            checkpoint: dict = torch.load(checkpoint_path, map_location=device)
+            map_location= f"cuda:{device}" if isinstance(device, int) else device
+            checkpoint: dict = torch.load(checkpoint_path, map_location=map_location)
             metrics.update(checkpoint.pop("metrics", dict()))
             for name, module in states.items():
                 module.load_state_dict(checkpoint[name])
