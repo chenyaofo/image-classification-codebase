@@ -1,7 +1,7 @@
 import logging
 
 import torch
-from torch.cuda.amp import autocast, GradScaler
+# from torch.cuda.amp import autocast, GradScaler
 
 from codebase.torchutils.distributed import world_size
 from codebase.torchutils.metrics import AccuracyMetric, AverageMetric, EstimatedTimeArrival
@@ -11,11 +11,11 @@ _logger = logging.getLogger(__name__)
 
 
 def train(epoch, model, loader, critirion, optimizer, scheduler,
-          use_amp, device, log_interval):
+          use_amp, use_deepspeed, device, log_interval):
     model.train()
 
-    if use_amp:
-        scaler = GradScaler()
+    # if use_amp:
+    #     scaler = GradScaler()
 
     loss_metric = AverageMetric("loss")
     accuracy_metric = AccuracyMetric(topk=(1, 5))
@@ -26,21 +26,31 @@ def train(epoch, model, loader, critirion, optimizer, scheduler,
     _logger.info(f"Train start, epoch={epoch:04d}, lr={lr:.6f}")
 
     for time_cost, iter_, (inputs, targets) in time_enumerate(loader, start=1):
-        inputs, targets = inputs.to(device=device), targets.to(device=device)
+        inputs, targets = inputs.to(device=device).half(), targets.to(device=device)
 
-        optimizer.zero_grad()
-
-        with autocast(enabled=use_amp):
-            outputs = model(inputs)
+        if use_deepspeed:
+            model_engine = model
+            outputs = model_engine(inputs)
             loss = critirion(outputs, targets)
 
-        if use_amp:
-            scaler.scale(loss).backward()
-            scaler.step(optimizer)
-            scaler.update()
+            model_engine.backward(loss)
+
+            model_engine.step()
         else:
-            loss.backward()
-            optimizer.step()
+            pass
+            # optimizer.zero_grad()
+
+            # with autocast(enabled=use_amp):
+            #     outputs = model(inputs)
+            #     loss = critirion(outputs, targets)
+
+            # if use_amp:
+            #     scaler.scale(loss).backward()
+            #     scaler.step(optimizer)
+            #     scaler.update()
+            # else:
+            #     loss.backward()
+            #     optimizer.step()
 
         loss_metric.update(loss)
         accuracy_metric.update(outputs, targets)

@@ -65,13 +65,11 @@ def _cifar(root, image_size, mean, std, batch_size, num_workers, is_vit, dataset
     train_loader = data.DataLoader(trainset, batch_size=batch_size,
                                    shuffle=(train_sampler is None),
                                    sampler=train_sampler,
-                                   num_workers=num_workers,
-                                   persistent_workers=True)
+                                   num_workers=num_workers,)
     val_loader = data.DataLoader(valset, batch_size=batch_size,
                                  shuffle=(val_sampler is None),
                                  sampler=val_sampler,
-                                 num_workers=num_workers,
-                                 persistent_workers=True)
+                                 num_workers=num_workers,)
 
     return train_loader, val_loader
 

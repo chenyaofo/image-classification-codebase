@@ -1,0 +1,47 @@
+{
+    "train_batch_size": 4,
+    "steps_per_print": 2000,
+    "optimizer": {
+        "type": "Adam",
+        "params": {
+            "lr": 0.001,
+            "betas": [
+                0.8,
+                0.999
+            ],
+            "eps": 1e-8,
+            "weight_decay": 3e-7
+        }
+    },
+    "scheduler": {
+        "type": "WarmupLR",
+        "params": {
+            "warmup_min_lr": 0,
+            "warmup_max_lr": 0.001,
+            "warmup_num_steps": 1000
+        }
+    },
+    "wall_clock_breakdown": false,
+    "zero_optimization": {
+        "stage": 3,
+        "cpu_offload": true,
+        "contiguous_gradients": true,
+        "overlap_comm": true
+    },
+    "fp16": {
+        "enabled": true,
+        "loss_scale": 0,
+        "initial_scale_power": 32,
+        "loss_scale_window": 1000,
+        "hysteresis": 2,
+        "min_loss_scale": 1
+    },
+    "activation_checkpointing": {
+        "partition_activations": true,
+        "cpu_checkpointing": true,
+        "contiguous_memory_optimization": true,
+        "number_checkpoints": true,
+        "synchronize_checkpoint_boundary": true,
+        "profile": true
+    }
+}

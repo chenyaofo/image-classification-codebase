@@ -1,6 +1,12 @@
+
+import os
+import sys
+sys.path.append("..")
 import logging
 import dataclasses
 import pprint
+
+import deepspeed
 
 import torch
 import torch.cuda
@@ -72,8 +78,19 @@ def main_worker(local_rank, ngpus_per_node, args: Args, conf: ConfigTree):
     train_loader, val_loader = DATA.build_from(conf.get("data"))
 
     criterion = CRITERION.build_from(conf.get("criterion"))
-    optimizer = OPTIMIZER.build_from(conf.get("optimizer"), dict(params=model.parameters()))
-    scheduler = SCHEDULER.build_from(conf.get("scheduler"), dict(optimizer=optimizer))
+
+    use_deepspeed = conf.get_bool("use_deepspeed")
+    if use_deepspeed:
+        args.deepspeed = True
+        args.deepspeed_config = "conf/ds_config.json"
+        os.environ["LOCAL_RANK"] = str(local_rank)
+        parameters = filter(lambda p: p.requires_grad, model.parameters())
+        model_engine, optimizer, _, scheduler = deepspeed.initialize(args=args,
+                                                                     model=model,
+                                                                     model_parameters=parameters)
+    else:
+        optimizer = OPTIMIZER.build_from(conf.get("optimizer"), dict(params=model.parameters()))
+        scheduler = SCHEDULER.build_from(conf.get("scheduler"), dict(optimizer=optimizer))
 
     max_epochs = conf.get_int("max_epochs")
 
@@ -107,8 +124,8 @@ def main_worker(local_rank, ngpus_per_node, args: Args, conf: ConfigTree):
     else:
         ETA = EstimatedTimeArrival(max_epochs)
         for epoch in range(start_epoch+1, max_epochs+1):
-            metrics += train(epoch, model, train_loader, criterion,
-                             optimizer, scheduler, use_amp, device, log_interval)
+            metrics += train(epoch, model_engine if use_deepspeed else model, train_loader, criterion,
+                             optimizer, scheduler, use_amp, use_deepspeed, device, log_interval)
             metrics += evaluate(epoch, model, val_loader, criterion, device, log_interval)
 
             for name, metric_values in metrics.items():
