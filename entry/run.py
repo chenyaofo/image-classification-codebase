@@ -1,6 +1,7 @@
 import logging
 import dataclasses
 import pprint
+from numpy import logical_not
 
 import torch
 import torch.cuda
@@ -19,6 +20,7 @@ from codebase.scheduler import SCHEDULER
 from codebase.criterion import CRITERION
 from codebase.engine import train, evaluate
 
+from codebase.torchutils.common import set_proper_device
 from codebase.torchutils.common import unwarp_module
 from codebase.torchutils.common import compute_nparam, compute_flops
 from codebase.torchutils.common import ModelSaver
@@ -45,24 +47,23 @@ def main(args: Args):
 
 
 def main_worker(local_rank, ngpus_per_node, args: Args, conf: ConfigTree):
-    if torch.cuda.is_available():
-        torch.cuda.set_device(local_rank)
-        device = torch.cuda.current_device()
-    else:
-        device = "cpu"
+    device = set_proper_device(local_rank)
 
     rank = args.node_rank*ngpus_per_node+local_rank
     init_logger(rank=rank, filenmae=args.output_dir/"default.log")
     writer = SummaryWriter(args.output_dir) if is_master() else DummyClass()
 
+    # log some diagnostic messages
     if not conf.get_bool("only_evaluate"):
         _logger.info("Collect envs from system:\n" + get_pretty_env_info())
         _logger.info("Args:\n" + pprint.pformat(dataclasses.asdict(args)))
 
+    # init distribited
     if args.world_size > 1:
         dist.init_process_group(backend=args.dist_backend, init_method=args.dist_url,
                                 world_size=args.world_size, rank=rank)
 
+    # init model, optimizer, scheduler
     model: nn.Module = MODEL.build_from(conf.get("model"))
 
     if is_dist_avail_and_init() and conf.get_bool("sync_batchnorm"):
@@ -78,17 +79,14 @@ def main_worker(local_rank, ngpus_per_node, args: Args, conf: ConfigTree):
     optimizer = OPTIMIZER.build_from(conf.get("optimizer"), dict(params=model.parameters()))
     scheduler = SCHEDULER.build_from(conf.get("scheduler"), dict(optimizer=optimizer))
 
-    max_epochs = conf.get_int("max_epochs")
-
-    metrics = MetricsList()
-
-    minitor_metric = "val/top1_acc"
-    states = dict(model=unwarp_module(model), optimizer=optimizer, scheduler=scheduler)
-
     if torch.cuda.is_available():
         model = model.to(device=device)
         criterion = criterion.to(device=device)
 
+    # restore metrics, model, optimizer and scheduler state of the checkpoint
+    metrics = MetricsList()
+    minitor_metric = "val/top1_acc"
+    states = dict(model=unwarp_module(model), optimizer=optimizer, scheduler=scheduler)
     saver = ModelSaver(args.output_dir)
     if conf.get_bool("auto_resume"):
         saver.restore(metrics, states, device=device)
@@ -100,25 +98,50 @@ def main_worker(local_rank, ngpus_per_node, args: Args, conf: ConfigTree):
 
     if is_dist_avail_and_init():
         model = nn.parallel.DistributedDataParallel(model, device_ids=[local_rank])
-    use_amp = conf.get_bool("use_amp")
-    log_interval = conf.get_int("log_interval")
 
     if conf.get_bool("only_evaluate"):
-        val_metrics = evaluate(0, model, val_loader, criterion, device, log_interval)
+        val_metrics = evaluate(
+            epoch=0,
+            model=model,
+            loader=val_loader,
+            criterion=criterion,
+            device=device,
+            log_interval=conf.get_int("log_interval")
+        )
         _logger.info(f"EVAL complete, top1-acc={val_metrics['val/top1_acc']*100:.2f}%, " +
                      f"top5-acc={val_metrics['val/top5_acc']*100:.2f}%")
     else:
-        ETA = EstimatedTimeArrival(max_epochs)
-        for epoch in range(start_epoch+1, max_epochs+1):
-            metrics += train(epoch, model, train_loader, criterion,
-                             optimizer, scheduler, use_amp, device, log_interval)
-            metrics += evaluate(epoch, model, val_loader, criterion, device, log_interval)
+        ETA = EstimatedTimeArrival(conf.get_int("max_epochs"))
+        for epoch in range(start_epoch+1, conf.get_int("max_epochs")+1):
+            metrics += train(
+                epoch=epoch,
+                model=model, laoder=train_loader,
+                criterion=criterion,
+                optimizer=optimizer,
+                scheduler=scheduler,
+                use_amp=conf.get_bool("use_amp"),
+                device=device,
+                log_interval=conf.get_int("log_interval")
+            )
+            metrics += evaluate(
+                epoch=epoch,
+                model=model,
+                loader=val_loader,
+                criterion=criterion,
+                device=device,
+                log_interval=conf.get_int("log_interval")
+            )
 
+            # record metric in tensorboard
             for name, metric_values in metrics.items():
                 writer.add_scalar(name, metric_values[-1], epoch)
 
+            # save checkpoint
             saver.save(minitor=minitor_metric, metrics=metrics.as_plain_dict(), states=states)
+
             ETA.step()
+
+            # log the best metric
             best_epoch_index, _ = find_best_metric(metrics[minitor_metric])
             best_top1acc = metrics["val/top1_acc"][best_epoch_index]
             best_top5acc = metrics["val/top5_acc"][best_epoch_index]
