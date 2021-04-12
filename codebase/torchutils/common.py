@@ -331,7 +331,7 @@ class ModelSaver:
     def restore(self, metrics: dict, states: dict, device="cuda:0"):
         checkpoint_path = self.output_directory / "checkpoint.pt"
         if checkpoint_path.exists():
-            map_location= f"cuda:{device}" if isinstance(device, int) else device
+            map_location = f"cuda:{device}" if isinstance(device, int) else device
             checkpoint: dict = torch.load(checkpoint_path, map_location=map_location)
             metrics.update(checkpoint.pop("metrics", dict()))
             for name, module in states.items():
@@ -398,3 +398,12 @@ class time_enumerate:
             end_time = time.perf_counter()
             self.counter += 1
             return end_time-start_time, self.counter, item
+
+
+def set_proper_device(local_rank):
+    if torch.cuda.is_available():
+        torch.cuda.set_device(local_rank)
+        device = torch.cuda.current_device()
+    else:
+        device = "cpu"
+    return device
