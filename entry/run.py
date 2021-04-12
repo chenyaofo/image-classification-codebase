@@ -65,6 +65,9 @@ def main_worker(local_rank, ngpus_per_node, args: Args, conf: ConfigTree):
 
     model: nn.Module = MODEL.build_from(conf.get("model"))
 
+    if is_dist_avail_and_init() and conf.get_bool("sync_batchnorm"):
+        model = nn.SyncBatchNorm.convert_sync_batchnorm(model)
+
     image_size = conf.get_int('data.image_size')
     _logger.info(f"Model details: n_params={compute_nparam(model)/1e6:.2f}M, "
                  f"flops={compute_flops(model,(1,3, image_size, image_size))/1e6:.2f}M.")
