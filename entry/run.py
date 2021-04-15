@@ -114,7 +114,8 @@ def main_worker(local_rank, ngpus_per_node, args: Args, conf: ConfigTree):
         for epoch in range(start_epoch+1, conf.get_int("max_epochs")+1):
             metrics += train(
                 epoch=epoch,
-                model=model, laoder=train_loader,
+                model=model,
+                loader=train_loader,
                 criterion=criterion,
                 optimizer=optimizer,
                 scheduler=scheduler,

@@ -10,7 +10,7 @@ from codebase.torchutils.common import SpeedTester, time_enumerate
 _logger = logging.getLogger(__name__)
 
 
-def train(epoch, model, loader, critirion, optimizer, scheduler,
+def train(epoch, model, loader, criterion, optimizer, scheduler,
           use_amp, device, log_interval):
     model.train()
 
@@ -32,7 +32,7 @@ def train(epoch, model, loader, critirion, optimizer, scheduler,
 
         with autocast(enabled=use_amp):
             outputs = model(inputs)
-            loss = critirion(outputs, targets)
+            loss = criterion(outputs, targets)
 
         if use_amp:
             scaler.scale(loss).backward()
@@ -71,7 +71,7 @@ def train(epoch, model, loader, critirion, optimizer, scheduler,
     }
 
 
-def evaluate(epoch, model, loader, critirion, device, log_interval):
+def evaluate(epoch, model, loader, criterion, device, log_interval):
     model.eval()
 
     loss_metric = AverageMetric("loss")
@@ -84,7 +84,7 @@ def evaluate(epoch, model, loader, critirion, device, log_interval):
 
         with torch.no_grad():
             outputs = model(inputs)
-            loss = critirion(outputs, targets)
+            loss = criterion(outputs, targets)
 
         loss_metric.update(loss)
         accuracy_metric.update(outputs, targets)
