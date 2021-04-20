@@ -15,6 +15,7 @@ import torch
 import torch.hub as hub
 import torch.nn as nn
 import torch.optim as optim
+import torch.cuda.amp as amp
 
 from .distributed import torchsave, is_master
 
@@ -196,15 +197,30 @@ class GradientAccumulator:
     def is_end_cycle(self):
         return self._counter == self.steps - 1
 
-    def bw_step(self, loss: torch.Tensor, optimizer: optim.Optimizer):
+    def backward_step(self, model: nn.Module, loss: torch.Tensor,
+                      optimizer: optim.Optimizer, scaler: amp.GradScaler):
         if optimizer is None:
             return
 
-        loss.backward(gradient=1/self.steps)
+        loss = loss / self.steps
+        if scaler is not None:
+            loss = scaler.scale(loss)
+
         if self.is_start_cycle:
             optimizer.zero_grad()
+
+        if isinstance(model, nn.parallel.DistributedDataParallel) and not self.is_end_cycle:
+            with model.no_sync():
+                loss.backward()
+        else:
+            loss.backward()
+
         if self.is_end_cycle:
-            optimizer.step()
+            if scaler is None:
+                optimizer.step()
+            else:
+                scaler.step(optimizer)
+                scaler.update()
 
         self.inc_counter()
 

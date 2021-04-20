@@ -120,6 +120,7 @@ def main_worker(local_rank, ngpus_per_node, args: Args, conf: ConfigTree):
                 optimizer=optimizer,
                 scheduler=scheduler,
                 use_amp=conf.get_bool("use_amp"),
+                accmulated_steps=conf.get_int("accmulated_steps"),
                 device=device,
                 log_interval=conf.get_int("log_interval")
             )

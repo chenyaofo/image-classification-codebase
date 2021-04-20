@@ -1,21 +1,35 @@
 import logging
 
 import torch
+import torch.nn as nn
+import torch.optim as optim
+import torch.utils.data as data
 from torch.cuda.amp import autocast, GradScaler
 
 from codebase.torchutils.distributed import world_size
 from codebase.torchutils.metrics import AccuracyMetric, AverageMetric, EstimatedTimeArrival
+from codebase.torchutils.common import GradientAccumulator
 from codebase.torchutils.common import SpeedTester, time_enumerate
 
 _logger = logging.getLogger(__name__)
 
 
-def train(epoch, model, loader, criterion, optimizer, scheduler,
-          use_amp, device, log_interval):
+def train(epoch: int,
+          model: nn.Module,
+          loader: data.DataLoader,
+          criterion: nn.modules.loss._Loss,
+          optimizer: optim.Optimizer,
+          scheduler: optim.lr_scheduler._LRScheduler,
+          only_epoch_sche: bool,
+          use_amp: bool,
+          accmulated_steps: int,
+          device: str,
+          log_interval: int):
     model.train()
 
-    if use_amp:
-        scaler = GradScaler()
+    scaler = GradScaler() if use_amp else None
+
+    gradident_accumulator = GradientAccumulator(accmulated_steps)
 
     loss_metric = AverageMetric("loss")
     accuracy_metric = AccuracyMetric(topk=(1, 5))
@@ -32,15 +46,16 @@ def train(epoch, model, loader, criterion, optimizer, scheduler,
 
         with autocast(enabled=use_amp):
             outputs = model(inputs)
-            loss = criterion(outputs, targets)
+            loss: torch.Tensor = criterion(outputs, targets)
 
-        if use_amp:
-            scaler.scale(loss).backward()
-            scaler.step(optimizer)
-            scaler.update()
-        else:
-            loss.backward()
-            optimizer.step()
+        gradident_accumulator.backward_step(model, loss, optimizer, scaler)
+
+        if scheduler is not None:
+            if only_epoch_sche:
+                if iter_ == 1:
+                    scheduler.step()
+            else:
+                scheduler.step()
 
         loss_metric.update(loss)
         accuracy_metric.update(outputs, targets)
@@ -60,9 +75,6 @@ def train(epoch, model, loader, criterion, optimizer, scheduler,
             ]))
             speed_tester.reset()
 
-    if scheduler is not None:
-        scheduler.step()
-
     return {
         "lr": lr,
         "train/loss": loss_metric.compute(),
@@ -71,7 +83,12 @@ def train(epoch, model, loader, criterion, optimizer, scheduler,
     }
 
 
-def evaluate(epoch, model, loader, criterion, device, log_interval):
+def evaluate(epoch: int,
+             model: nn.Module,
+             loader: data.DataLoader,
+             criterion: nn.modules.loss._Loss,
+             device: str,
+             log_interval: int):
     model.eval()
 
     loss_metric = AverageMetric("loss")
