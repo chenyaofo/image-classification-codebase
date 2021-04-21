@@ -8,7 +8,7 @@ import random
 import subprocess
 import pathlib
 import collections
-from functools import wraps
+from functools import partial, reduce, wraps
 
 import numpy
 import torch
@@ -83,13 +83,21 @@ def compute_flops(module: nn.Module, size: int) -> int:
     Returns:
         int: The number of MAdds.
     """
-    def size_hook(module: nn.Module, input: torch.Tensor, output: torch.Tensor):
-        *_, h, w = output.shape
-        module.output_size = (h, w)
+    def size_hook(module: nn.Module, input: torch.Tensor, output: torch.Tensor, name: str):
+        # print(name)
+        # print(type(input))
+        # import ipdb; ipdb.set_trace()
+        module.input_size = input[0].shape
+        module.output_size = output.shape
+
+    def prod(items):
+        return reduce(lambda a, b: a*b, items)
+
     hooks = []
     for name, m in module.named_modules():
-        if isinstance(m, nn.Conv2d):
-            hooks.append(m.register_forward_hook(size_hook))
+        if isinstance(m, (nn.Linear, nn.Conv2d)):
+            hooks.append(m.register_forward_hook(partial(size_hook, name=name)))
+
     with torch.no_grad():
         training = module.training
         module.eval()
@@ -101,11 +109,11 @@ def compute_flops(module: nn.Module, size: int) -> int:
     flops = 0
     for name, m in module.named_modules():
         if isinstance(m, nn.Conv2d):
-            h, w = m.output_size
+            *_, h, w = m.output_size
             kh, kw = m.kernel_size
             flops += h * w * m.in_channels * m.out_channels * kh * kw / m.groups
         if isinstance(m, nn.Linear):
-            flops += m.in_features * m.out_features
+            flops += prod(m.input_size) * m.out_features
     return flops
 
 
