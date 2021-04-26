@@ -78,7 +78,3 @@ pyhocon -i conf/cifar10.conf -f properties
   howpublished = {\url{https://github.com/chenyaofo/image-classification-codebase}}
 }
 ```
-
-## License
-
-MIT License
