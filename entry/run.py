@@ -45,7 +45,10 @@ def main(args: Args):
         main_worker(local_rank, ngpus_per_node, args, args.conf)
 
 
-def main_worker(local_rank, ngpus_per_node, args: Args, conf: ConfigTree):
+def main_worker(local_rank: int,
+                ngpus_per_node: int,
+                args: Args,
+                conf: ConfigTree):
     device = set_proper_device(local_rank)
 
     rank = args.node_rank*ngpus_per_node+local_rank
@@ -64,6 +67,8 @@ def main_worker(local_rank, ngpus_per_node, args: Args, conf: ConfigTree):
 
     # init model, optimizer, scheduler
     model: nn.Module = MODEL.build_from(conf.get("model"))
+    if conf.get("model.load_from", None) is not None:
+        model.load_state_dict(torch.load(conf.get("model.load_from"), map_location="cpu"))
 
     if is_dist_avail_and_init() and conf.get_bool("sync_batchnorm"):
         model = nn.SyncBatchNorm.convert_sync_batchnorm(model)
