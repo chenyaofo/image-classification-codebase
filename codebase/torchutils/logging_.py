@@ -1,16 +1,9 @@
 import os
 import sys
-import time
 import typing
 import logging
-import uuid
 import glob
 import zipfile
-
-from torch.utils.collect_env import get_pretty_env_info
-
-from .distributed import is_master
-from .common import get_branch_name, get_last_commit_id
 
 
 _logger = logging.getLogger(__name__)

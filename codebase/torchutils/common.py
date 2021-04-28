@@ -84,9 +84,6 @@ def compute_flops(module: nn.Module, size: int) -> int:
         int: The number of MAdds.
     """
     def size_hook(module: nn.Module, input: torch.Tensor, output: torch.Tensor, name: str):
-        # print(name)
-        # print(type(input))
-        # import ipdb; ipdb.set_trace()
         module.input_size = input[0].shape
         module.output_size = output.shape
 
@@ -424,7 +421,7 @@ class time_enumerate:
             return end_time-start_time, self.counter, item
 
 
-def set_proper_device(local_rank):
+def set_proper_device(local_rank: int):
     if torch.cuda.is_available():
         torch.cuda.set_device(local_rank)
         device = torch.cuda.current_device()
