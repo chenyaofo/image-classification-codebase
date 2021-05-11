@@ -117,6 +117,10 @@ def main_worker(local_rank: int,
     else:
         ETA = EstimatedTimeArrival(conf.get_int("max_epochs"))
         for epoch in range(start_epoch+1, conf.get_int("max_epochs")+1):
+            if is_dist_avail_and_init():
+                train_loader.sampler.set_epoch(epoch)
+                val_loader.sampler.set_epoch(epoch)
+                
             metrics += train(
                 epoch=epoch,
                 model=model,
