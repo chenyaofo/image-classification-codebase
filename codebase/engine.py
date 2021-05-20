@@ -20,7 +20,7 @@ def train(epoch: int,
           criterion: nn.modules.loss._Loss,
           optimizer: optim.Optimizer,
           scheduler: optim.lr_scheduler._LRScheduler,
-          only_epoch_sche: bool,
+          #   only_epoch_sche: bool,
           use_amp: bool,
           accmulated_steps: int,
           device: str,
@@ -50,13 +50,6 @@ def train(epoch: int,
 
         gradident_accumulator.backward_step(model, loss, optimizer, scaler)
 
-        if scheduler is not None:
-            if only_epoch_sche:
-                if iter_ == 1:
-                    scheduler.step()
-            else:
-                scheduler.step()
-
         loss_metric.update(loss)
         accuracy_metric.update(outputs, targets)
         ETA.step()
@@ -74,6 +67,9 @@ def train(epoch: int,
                 f"{ETA}",
             ]))
             speed_tester.reset()
+
+    if scheduler is not None:
+        scheduler.step()
 
     return {
         "lr": lr,
