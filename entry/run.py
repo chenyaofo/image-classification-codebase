@@ -66,8 +66,10 @@ def main_worker(local_rank: int,
                                 world_size=args.world_size, rank=rank)
 
     # init model, optimizer, scheduler
-    model: nn.Module = MODEL.build_from(conf.get("model"))
-    if conf.get("model.load_from", None) is not None:
+    model_config = conf.get("model")
+    load_from = model_config.pop("load_from")
+    model: nn.Module = MODEL.build_from(model_config)
+    if load_from is not None:
         model.load_state_dict(torch.load(conf.get("model.load_from"), map_location="cpu"))
 
     if is_dist_avail_and_init() and conf.get_bool("sync_batchnorm"):
@@ -120,7 +122,7 @@ def main_worker(local_rank: int,
             if is_dist_avail_and_init():
                 train_loader.sampler.set_epoch(epoch)
                 val_loader.sampler.set_epoch(epoch)
-                
+
             metrics += train(
                 epoch=epoch,
                 model=model,
