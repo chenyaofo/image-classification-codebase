@@ -1,10 +1,13 @@
+import logging
 import torch.utils.data as data
 import torchvision.transforms as T
 from torchvision.datasets import CIFAR10, CIFAR100
-from torch.utils.data.distributed import DistributedSampler
 
+from .utils import get_samplers
 from .register import DATA
-from codebase.torchutils.distributed import is_dist_avail_and_init
+
+
+_logger = logging.getLogger(__name__)
 
 
 def get_train_transforms(mean, std):
@@ -39,16 +42,6 @@ def get_vit_val_transforms(mean, std, img_size):
     ])
 
 
-def get_samplers(trainset, valset):
-    if is_dist_avail_and_init():
-        train_sampler = DistributedSampler(trainset)
-        val_sampler = DistributedSampler(valset, shuffle=False)
-    else:
-        train_sampler = None
-        val_sampler = None
-    return train_sampler, val_sampler
-
-
 def _cifar(root, image_size, mean, std, batch_size, num_workers, is_vit, dataset_builder, **kwargs):
     if is_vit:
         train_transforms = get_vit_train_transforms(mean, std, image_size)
@@ -60,7 +53,10 @@ def _cifar(root, image_size, mean, std, batch_size, num_workers, is_vit, dataset
     trainset = dataset_builder(root, train=True, transform=train_transforms, download=True)
     valset = dataset_builder(root, train=False, transform=val_transforms, download=True)
 
-    train_sampler, val_sampler = get_samplers(trainset, valset)
+    _logger.info(f"Loading {dataset_builder.__name__} dataset with trainset (len={len(trainset)}) and valset (len={len(valset)})")
+
+    train_sampler = get_samplers(trainset, is_training=True)
+    val_sampler = get_samplers(valset, is_training=False)
 
     train_loader = data.DataLoader(trainset, batch_size=batch_size,
                                    shuffle=(train_sampler is None),
