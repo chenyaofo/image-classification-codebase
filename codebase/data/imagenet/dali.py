@@ -50,9 +50,9 @@ class WebDatasetExternalSource:
     next = __next__
 
 
-def create_dali_pipeline(reader, image_size, batch_size, mean, std, num_workers, dali_cpu=False, is_training=True):
+def create_dali_pipeline(reader, image_size, batch_size, mean, std, num_workers, local_rank, dali_cpu=False, is_training=True):
     # refer to https://github.com/NVIDIA/DALI/blob/54034c4ddd7cfe2b6dda7e8cec5f91ae18f7ad39/docs/examples/use_cases/pytorch/resnet50/main.py
-    pipe = Pipeline(batch_size, num_workers, device_id=0)
+    pipe = Pipeline(batch_size, num_workers, device_id=local_rank)
     with pipe:
         images, labels = reader
         # images, labels = fn.external_source(source=eii, num_outputs=2)
@@ -68,10 +68,10 @@ def create_dali_pipeline(reader, image_size, batch_size, mean, std, num_workers,
         if is_training:
             images = fn.decoders.image_random_crop(images,
                                                    device=decoder_device, output_type=types.RGB,
-                                                #    device_memory_padding=device_memory_padding,
-                                                #    host_memory_padding=host_memory_padding,
-                                                #    preallocate_width_hint=preallocate_width_hint,
-                                                #    preallocate_height_hint=preallocate_height_hint,
+                                                   #    device_memory_padding=device_memory_padding,
+                                                   #    host_memory_padding=host_memory_padding,
+                                                   #    preallocate_width_hint=preallocate_width_hint,
+                                                   #    preallocate_height_hint=preallocate_height_hint,
                                                    random_aspect_ratio=[0.75, 4.0 / 3.0],
                                                    random_area=[0.08, 1.0],
                                                    num_attempts=100)
@@ -104,7 +104,8 @@ def create_dali_pipeline(reader, image_size, batch_size, mean, std, num_workers,
     return pipe
 
 
-def _build_imagenet_dali_loader(root, is_training, image_size, mean, std, batch_size, num_workers, use_webdataset, dataset_len=None):
+def _build_imagenet_dali_loader(root, is_training, image_size, mean, std, batch_size, num_workers,
+                                use_webdataset, dataset_len=None, local_rank=None):
     if use_webdataset:
         dataset = (
             wds.WebDataset(glob_tars(pathlib.Path(root)/("train" if is_training else "val")))
@@ -126,10 +127,10 @@ def _build_imagenet_dali_loader(root, is_training, image_size, mean, std, batch_
                                  random_shuffle=is_training,
                                  pad_last_batch=False,
                                  name="Reader")
-    pipe = create_dali_pipeline(reader, image_size, batch_size, mean, std, num_workers, is_training=is_training)
+    pipe = create_dali_pipeline(reader, image_size, batch_size, mean, std, num_workers, local_rank, is_training=is_training)
     loader = DALIGenericIterator(pipe,
                                  output_map=["images", "targets"],
-                                #  size = dataset_len if use_webdataset else -1,
+                                 #  size = dataset_len if use_webdataset else -1,
                                  auto_reset=True,
                                  last_batch_policy=LastBatchPolicy.DROP if is_training else LastBatchPolicy.PARTIAL,
                                  dynamic_shape=True,
@@ -139,7 +140,7 @@ def _build_imagenet_dali_loader(root, is_training, image_size, mean, std, batch_
         if is_training:
             length = dataset_len // (world_size() * batch_size)
         else:
-            length = math.ceil(dataset_len / (world_size() * batch_size))       
+            length = math.ceil(dataset_len / (world_size() * batch_size))
         loader.length = length
         _logger.info(f"Manully set loader.length to {length}")
     # if hasattr(loader, "length"):
@@ -153,6 +154,9 @@ def _build_imagenet_dali_loader(root, is_training, image_size, mean, std, batch_
     return loader
 
 
-def build_imagenet_dali_loader(root, image_size, mean, std, batch_size, num_workers, use_webdataset, trainset_len, valset_len):
-    return _build_imagenet_dali_loader(root, True, image_size, mean, std, batch_size, num_workers, use_webdataset, trainset_len),\
-        _build_imagenet_dali_loader(root, False, image_size, mean, std, batch_size, num_workers, use_webdataset, valset_len)
+def build_imagenet_dali_loader(root, image_size, mean, std, batch_size, num_workers,
+                               use_webdataset, trainset_len, valset_len, local_rank):
+    return _build_imagenet_dali_loader(root, True, image_size, mean, std, batch_size, num_workers,
+                                       use_webdataset, trainset_len, local_rank),\
+        _build_imagenet_dali_loader(root, False, image_size, mean, std, batch_size, num_workers,
+                                    use_webdataset, valset_len, local_rank)

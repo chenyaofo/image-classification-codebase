@@ -24,6 +24,7 @@ _logger = logging.getLogger(__name__)
 def identity(x):
     return x
 
+
 def get_train_transforms(crop_size, mean, std, is_training):
     pipelines = []
     if is_training:
@@ -76,6 +77,7 @@ def _build_imagenet_loader(root, is_training, image_size, mean, std, batch_size,
     return loader
 
 
-def build_imagenet_loader(root, image_size, mean, std, batch_size, num_workers, use_webdataset, trainset_len, valset_len):
+def build_imagenet_loader(root, image_size, mean, std, batch_size, num_workers,
+                          use_webdataset, trainset_len, valset_len):
     return _build_imagenet_loader(root, True, image_size, mean, std, batch_size, num_workers, use_webdataset, trainset_len),\
         _build_imagenet_loader(root, False, image_size, mean, std, batch_size, num_workers, use_webdataset, valset_len)

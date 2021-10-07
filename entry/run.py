@@ -87,11 +87,11 @@ def main_worker(local_rank: int,
     _logger.info(f"Model details: n_params={compute_nparam(model)/1e6:.2f}M, "
                  f"flops={compute_flops(model,(1,3, image_size, image_size))/1e6:.2f}M.")
 
-    train_loader, val_loader = DATA.build_from(conf.get("data"))
+    train_loader, val_loader = DATA.build_from(conf.get("data"), dict(local_rank=local_rank))
 
     criterion = CRITERION.build_from(conf.get("criterion"))
 
-    optimizer_config:dict = conf.get("optimizer")
+    optimizer_config: dict = conf.get("optimizer")
     basic_bs = optimizer_config.pop("basic_bs")
     optimizer_config["lr"] = optimizer_config["lr"] * (conf.get("data.batch_size") * world_size() / basic_bs)
     optimizer = OPTIMIZER.build_from(optimizer_config, dict(params=model.named_parameters()))
