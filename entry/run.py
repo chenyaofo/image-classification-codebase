@@ -19,6 +19,7 @@ from codebase.scheduler import SCHEDULER
 from codebase.criterion import CRITERION
 from codebase.engine import train, evaluate
 
+from codebase.torchutils.common import set_cudnn_auto_tune, set_reproducible, generate_random_seed
 from codebase.torchutils.common import set_proper_device
 from codebase.torchutils.common import unwarp_module
 from codebase.torchutils.common import compute_nparam, compute_flops
@@ -50,6 +51,13 @@ def main_worker(local_rank: int,
                 args: Args,
                 conf: ConfigTree):
     device = set_proper_device(local_rank)
+
+    if conf.get("set_reproducible"):
+        seed = generate_random_seed()
+        set_reproducible(seed)
+        _logger.info(f"Set the training to be reproducible with seed={seed}")
+    else:
+        set_cudnn_auto_tune()
 
     rank = args.node_rank*ngpus_per_node+local_rank
     init_logger(rank=rank, filenmae=args.output_dir/"default.log")
