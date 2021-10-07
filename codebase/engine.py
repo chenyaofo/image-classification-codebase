@@ -133,7 +133,7 @@ def evaluate(epoch: int,
 
         batch_size, *_ = inputs.shape
         cnt += batch_size
-        _logger.info(f"eval total batch size={cnt}")
+        # _logger.info(f"eval total batch size={cnt}")
 
         with torch.no_grad():
             outputs = model(inputs)
