@@ -340,7 +340,7 @@ class ModelSaver:
 
     @only_master
     def save(self, minitor: str, metrics: dict, states: dict):
-        checkpoint = {k: v.state_dict() for k, v in states.items()}
+        checkpoint = {k: v.state_dict() for k, v in states.items() if hasattr(v, "state_dict")}
         checkpoint["metrics"] = metrics
 
         torchsave(checkpoint, self.output_directory / "checkpoint.pt")
