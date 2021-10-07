@@ -55,7 +55,7 @@ If you want to modify the configuration hyperparameters, you have two ways:
 For example, if you hope to modify the total training epochs to 100 and the learning rate to 0.05. You can run the following command:
 
 ```bash
-CUDA_VISIBLE_DEVICES=0 python -m entry.run --conf conf/cifar10.conf -o output/cifar10/resnet20 -M 'max_epochs=100' 'optimizer.lr=0.05'
+CUDA_VISIBLE_DEVICES=0 python -m entry.run --conf conf/cifar10.conf -o output/cifar10/resnet20 -M max_epochs=100 optimizer.lr=0.05
 ```
 
 If you modify a non existing hyperparameter, the code will raise an exception.
@@ -65,6 +65,11 @@ To list all valid hyperparameters names, you can run the following command:
 ```bash
 pyhocon -i conf/cifar10.conf -f properties
 ```
+
+3. We use NVIDIA DALI to accelerate the data preprocessing on ImageNet (use it by the flag `data.use_dali`) and webdataset tarfile format to store the ImageNet (create the tarfiles by `tools/make_wds.py` and use it by the flag `data.use_webdataset`).
+
+
+Finally, enjoy the code.
 
 ## Cite
 
