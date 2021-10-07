@@ -1,6 +1,9 @@
 import math
 
+from .register import SCHEDULER
 
+
+@SCHEDULER.register
 class WarmupCosineAnnealingLR(object):
     def __init__(self, optimizer, T_warmup, T_max, eta_min=0, last_epoch=-1):
         self.T_warmup = T_warmup

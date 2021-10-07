@@ -10,7 +10,7 @@ from .register import CRITERION
 class LabelSmoothCrossEntropyLoss(_WeightedLoss):
     def __init__(self, num_classes, epsilon=0.1, weight=None, size_average=None,
                  reduce=None, reduction='mean'):
-        super(LabelSmoothCrossEntropyLoss, self).__init__(weight, size_average, reduce, reduction)
+        super().__init__(weight, size_average, reduce, reduction)
         self.num_classes = num_classes
         self.epsilon = epsilon
 

@@ -15,6 +15,7 @@ from codebase.torchutils.common import SpeedTester, time_enumerate
 
 _logger = logging.getLogger(__name__)
 
+
 def fetch_data(datas, device):
     if isinstance(datas, (list, tuple)):
         if isinstance(datas[0], dict):
@@ -26,6 +27,7 @@ def fetch_data(datas, device):
         raise ValueError(f"Invilid data format with data={datas}")
     inputs, targets = inputs.to(device=device, non_blocking=True), targets.to(device=device, non_blocking=True)
     return inputs, targets
+
 
 def train(epoch: int,
           model: nn.Module,
@@ -47,19 +49,21 @@ def train(epoch: int,
     if hasattr(loader, "length"):
         loader_len = loader.length
     else:
-        loader_len= len(loader)
-        
+        loader_len = len(loader)
+
     time_cost_metric = AverageMetric("time_cost")
     loss_metric = AverageMetric("loss")
     accuracy_metric = AccuracyMetric(topk=(1, 5))
     ETA = EstimatedTimeArrival(loader_len)
     speed_tester = SpeedTester()
 
+    if scheduler is not None:
+        scheduler.step(epoch)
+
     lr = optimizer.param_groups[0]['lr']
     _logger.info(f"Train start, epoch={epoch:04d}, lr={lr:.6f}")
 
     cnt = 0
-
 
     for time_cost, iter_, datas in time_enumerate(loader, start=1):
         inputs, targets = fetch_data(datas, device)
@@ -79,7 +83,7 @@ def train(epoch: int,
         speed_tester.update(inputs)
 
         batch_size, *_ = inputs.shape
-        cnt+=batch_size
+        cnt += batch_size
         # _logger.info(f"train total batch size={cnt}")
 
         if iter_ % log_interval == 0 or iter_ == loader_len:
@@ -95,9 +99,6 @@ def train(epoch: int,
             ]))
             time_cost_metric.reset()
             speed_tester.reset()
-
-    if scheduler is not None:
-        scheduler.step()
 
     return {
         "lr": lr,
@@ -118,20 +119,20 @@ def evaluate(epoch: int,
     if hasattr(loader, "length"):
         loader_len = loader.length
     else:
-        loader_len= len(loader)
+        loader_len = len(loader)
 
     time_cost_metric = AverageMetric("time_cost")
     loss_metric = AverageMetric("loss")
     accuracy_metric = AccuracyMetric(topk=(1, 5))
     ETA = EstimatedTimeArrival(loader_len)
     speed_tester = SpeedTester()
-    cnt=0
+    cnt = 0
 
     for time_cost, iter_, datas in time_enumerate(loader, start=1):
         inputs, targets = fetch_data(datas, device)
 
         batch_size, *_ = inputs.shape
-        cnt+=batch_size
+        cnt += batch_size
         _logger.info(f"eval total batch size={cnt}")
 
         with torch.no_grad():

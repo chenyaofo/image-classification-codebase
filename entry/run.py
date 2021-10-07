@@ -27,7 +27,7 @@ from codebase.torchutils.common import MetricsList
 from codebase.torchutils.common import patch_download_in_cn
 from codebase.torchutils.common import DummyClass
 from codebase.torchutils.common import find_best_metric
-from codebase.torchutils.distributed import is_dist_avail_and_init, is_master
+from codebase.torchutils.distributed import is_dist_avail_and_init, is_master, world_size
 from codebase.torchutils.metrics import EstimatedTimeArrival
 from codebase.torchutils.logging_ import init_logger
 
@@ -82,7 +82,13 @@ def main_worker(local_rank: int,
     train_loader, val_loader = DATA.build_from(conf.get("data"))
 
     criterion = CRITERION.build_from(conf.get("criterion"))
-    optimizer = OPTIMIZER.build_from(conf.get("optimizer"), dict(params=model.parameters()))
+
+    optimizer_config:dict = conf.get("optimizer")
+    basic_bs = optimizer_config.pop("basic_bs")
+    optimizer_config["lr"] = optimizer_config["lr"] * (conf.get("data.batch_size") * world_size() / basic_bs)
+    optimizer = OPTIMIZER.build_from(optimizer_config, dict(params=model.named_parameters()))
+    _logger.info(f'Set lr={optimizer_config["lr"]:.4f} with batch size={conf.get("data.batch_size") * world_size()}')
+
     scheduler = SCHEDULER.build_from(conf.get("scheduler"), dict(optimizer=optimizer))
 
     if torch.cuda.is_available():

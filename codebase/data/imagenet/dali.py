@@ -72,14 +72,14 @@ def create_dali_pipeline(reader, image_size, batch_size, mean, std, num_workers,
                                                    host_memory_padding=host_memory_padding,
                                                    preallocate_width_hint=preallocate_width_hint,
                                                    preallocate_height_hint=preallocate_height_hint,
-                                                   random_aspect_ratio=[0.8, 1.25],
-                                                   random_area=[0.1, 1.0],
+                                                   random_aspect_ratio=[0.75, 4.0 / 3.0],
+                                                   random_area=[0.08, 1.0],
                                                    num_attempts=100)
             images = fn.resize(images,
                                device=dali_device,
                                resize_x=image_size,
                                resize_y=image_size,
-                               interp_type=types.INTERP_TRIANGULAR)
+                               interp_type=types.INTERP_LINEAR)
             mirror = fn.random.coin_flip(probability=0.5)
         else:
             images = fn.decoders.image(images,
@@ -89,7 +89,7 @@ def create_dali_pipeline(reader, image_size, batch_size, mean, std, num_workers,
                                device=dali_device,
                                size=int(image_size/7*8),
                                mode="not_smaller",
-                               interp_type=types.INTERP_TRIANGULAR)
+                               interp_type=types.INTERP_LINEAR)
             mirror = False
 
         images = fn.crop_mirror_normalize(images.gpu(),
