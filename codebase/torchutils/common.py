@@ -356,7 +356,8 @@ class ModelSaver:
             checkpoint: dict = torch.load(checkpoint_path, map_location=map_location)
             metrics.update(checkpoint.pop("metrics", dict()))
             for name, module in states.items():
-                module.load_state_dict(checkpoint[name])
+                if hasattr(module, "load_state_dict"):
+                    module.load_state_dict(checkpoint[name])
 
 
 class MetricsList(collections.defaultdict):
