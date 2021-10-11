@@ -8,8 +8,8 @@ _logger = logging.getLogger(__name__)
 
 
 class SyntheticDataLoader:
-    def __init__(self, image_size, target_size, num_classes,  device="cuda"):
-        self.images = torch.rand(image_size, device=device, dtype=torch.float)
+    def __init__(self, input_size, target_size, num_classes,  device="cuda"):
+        self.images = torch.rand(input_size, device=device, dtype=torch.float)
         self.targets = torch.randint(0, num_classes, target_size, device=device, dtype=torch.long)
 
     def __iter__(self):
@@ -23,6 +23,6 @@ class SyntheticDataLoader:
 
 
 @DATA.register
-def synthetic_data(image_size, target_size, num_classes, device, **kwargs):
-    return SyntheticDataLoader(image_size, target_size, num_classes, device),\
-        SyntheticDataLoader(image_size, target_size, num_classes, device)
+def synthetic_data(input_size, target_size, num_classes, device, **kwargs):
+    return SyntheticDataLoader(input_size, target_size, num_classes, device),\
+        SyntheticDataLoader(input_size, target_size, num_classes, device)
