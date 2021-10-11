@@ -3,7 +3,9 @@ import dataclasses
 import pprint
 
 import torch
+from torch import optim
 import torch.cuda
+import torch.utils.data
 import torch.nn as nn
 import torch.distributed as dist
 import torch.multiprocessing as mp
@@ -44,6 +46,70 @@ def main(args: Args):
     else:
         local_rank = 0
         main_worker(local_rank, ngpus_per_node, args, args.conf)
+
+
+def train_pipeline(
+    start_epoch: int,
+    max_epochs: int,
+    train_loader: torch.utils.data.DataLoader,
+    val_loader: torch.utils.data.DataLoader,
+    model: nn.Module,
+    optimizer: optim.Optimizer,
+    criterion: nn.Module,
+    scheduler: optim.lr_scheduler._LRScheduler,
+    metrics: MetricsList,
+    use_amp: bool,
+    accmulated_steps: int,
+    device: str,
+    log_interval: int,
+    writer: SummaryWriter,
+    saver: ModelSaver,
+    monitor_metric: str,
+    states: dict,
+):
+    ETA = EstimatedTimeArrival(max_epochs)
+    for epoch in range(start_epoch+1, max_epochs+1):
+        if is_dist_avail_and_init():
+            if hasattr(train_loader, "sampler"):
+                train_loader.sampler.set_epoch(epoch)
+                val_loader.sampler.set_epoch(epoch)
+
+        metrics += train(
+            epoch=epoch,
+            model=model,
+            loader=train_loader,
+            criterion=criterion,
+            optimizer=optimizer,
+            scheduler=scheduler,
+            use_amp=use_amp,
+            accmulated_steps=accmulated_steps,
+            device=device,
+            log_interval=log_interval
+        )
+        metrics += evaluate(
+            epoch=epoch,
+            model=model,
+            loader=val_loader,
+            criterion=criterion,
+            device=device,
+            log_interval=log_interval
+        )
+
+        # record metric in tensorboard
+        for name, metric_values in metrics.items():
+            writer.add_scalar(name, metric_values[-1], epoch)
+
+        # save checkpoint
+        saver.save(minitor=monitor_metric, metrics=metrics.as_plain_dict(), states=states)
+
+        ETA.step()
+
+        # log the best metric
+        best_epoch_index, _ = find_best_metric(metrics[monitor_metric])
+        best_top1acc = metrics["val/top1_acc"][best_epoch_index]
+        best_top5acc = metrics["val/top5_acc"][best_epoch_index]
+        _logger.info(f"Epoch={epoch:04d} complete, best val top1-acc={best_top1acc*100:.2f}%, "
+                     f"top5-acc={best_top5acc*100:.2f}% (epoch={best_epoch_index+1}), {ETA}")
 
 
 def main_worker(local_rank: int,
@@ -105,12 +171,12 @@ def main_worker(local_rank: int,
 
     # restore metrics, model, optimizer and scheduler state of the checkpoint
     metrics = MetricsList()
-    minitor_metric = "val/top1_acc"
+    monitor_metric = "val/top1_acc"
     states = dict(model=unwarp_module(model), optimizer=optimizer, scheduler=scheduler)
     saver = ModelSaver(args.output_dir)
     if conf.get_bool("auto_resume"):
         saver.restore(metrics, states, device=device)
-        start_epoch = len(metrics[minitor_metric])
+        start_epoch = len(metrics[monitor_metric])
         if start_epoch != 0:
             _logger.info(f"Load chckpoint from epoch={start_epoch}.")
     else:
@@ -131,49 +197,25 @@ def main_worker(local_rank: int,
         _logger.info(f"EVAL complete, top1-acc={val_metrics['val/top1_acc']*100:.2f}%, " +
                      f"top5-acc={val_metrics['val/top5_acc']*100:.2f}%")
     else:
-        ETA = EstimatedTimeArrival(conf.get_int("max_epochs"))
-        for epoch in range(start_epoch+1, conf.get_int("max_epochs")+1):
-            if is_dist_avail_and_init():
-                if hasattr(train_loader, "sampler"):
-                    train_loader.sampler.set_epoch(epoch)
-                    val_loader.sampler.set_epoch(epoch)
-
-            metrics += train(
-                epoch=epoch,
-                model=model,
-                loader=train_loader,
-                criterion=criterion,
-                optimizer=optimizer,
-                scheduler=scheduler,
-                use_amp=conf.get_bool("use_amp"),
-                accmulated_steps=conf.get_int("accmulated_steps"),
-                device=device,
-                log_interval=conf.get_int("log_interval")
-            )
-            metrics += evaluate(
-                epoch=epoch,
-                model=model,
-                loader=val_loader,
-                criterion=criterion,
-                device=device,
-                log_interval=conf.get_int("log_interval")
-            )
-
-            # record metric in tensorboard
-            for name, metric_values in metrics.items():
-                writer.add_scalar(name, metric_values[-1], epoch)
-
-            # save checkpoint
-            saver.save(minitor=minitor_metric, metrics=metrics.as_plain_dict(), states=states)
-
-            ETA.step()
-
-            # log the best metric
-            best_epoch_index, _ = find_best_metric(metrics[minitor_metric])
-            best_top1acc = metrics["val/top1_acc"][best_epoch_index]
-            best_top5acc = metrics["val/top5_acc"][best_epoch_index]
-            _logger.info(f"Epoch={epoch:04d} complete, best val top1-acc={best_top1acc*100:.2f}%, "
-                         f"top5-acc={best_top5acc*100:.2f}% (epoch={best_epoch_index+1}), {ETA}")
+        train_pipeline(
+            start_epoch=start_epoch,
+            max_epochs=conf.get_int("max_epochs"),
+            train_loader=train_loader,
+            val_loader=val_loader,
+            model=model,
+            optimizer=optimizer,
+            criterion=criterion,
+            scheduler=scheduler,
+            metrics=metrics,
+            use_amp=conf.get_bool("use_amp"),
+            accmulated_steps=conf.get_int("accmulated_steps"),
+            device=device,
+            log_interval=conf.get_int("log_interval"),
+            writer=writer,
+            saver=saver,
+            monitor_metric=monitor_metric,
+            states=states,
+        )
 
 
 if __name__ == "__main__":
