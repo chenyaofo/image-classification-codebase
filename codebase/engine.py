@@ -63,8 +63,6 @@ def train(epoch: int,
     lr = optimizer.param_groups[0]['lr']
     _logger.info(f"Train start, epoch={epoch:04d}, lr={lr:.6f}")
 
-    cnt = 0
-
     for time_cost, iter_, datas in time_enumerate(loader, start=1):
         inputs, targets = fetch_data(datas, device)
 
@@ -81,10 +79,6 @@ def train(epoch: int,
         accuracy_metric.update(outputs, targets)
         ETA.step()
         speed_tester.update(inputs)
-
-        batch_size, *_ = inputs.shape
-        cnt += batch_size
-        # _logger.info(f"train total batch size={cnt}")
 
         if iter_ % log_interval == 0 or iter_ == loader_len:
             _logger.info(", ".join([
@@ -126,14 +120,9 @@ def evaluate(epoch: int,
     accuracy_metric = AccuracyMetric(topk=(1, 5))
     ETA = EstimatedTimeArrival(loader_len)
     speed_tester = SpeedTester()
-    cnt = 0
 
     for time_cost, iter_, datas in time_enumerate(loader, start=1):
         inputs, targets = fetch_data(datas, device)
-
-        batch_size, *_ = inputs.shape
-        cnt += batch_size
-        # _logger.info(f"eval total batch size={cnt}")
 
         with torch.no_grad():
             outputs = model(inputs)
