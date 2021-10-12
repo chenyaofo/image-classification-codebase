@@ -128,7 +128,7 @@ def _build_imagenet_dali_loader(root, is_training, image_size, mean, std, batch_
     if use_webdataset:
         dataset = (
             wds.WebDataset(glob_tars(pathlib.Path(root)/("train" if is_training else "val")))
-            .shuffle(os.environ.get("WDS_BUFFER_SIZE", 5000) if is_training else -1)
+            .shuffle(int(os.environ.get("WDS_BUFFER_SIZE", 5000)) if is_training else -1)
             .to_tuple("jpg;png", "cls")
             .map_tuple(
                 lambda b: numpy.frombuffer(b, dtype=numpy.uint8),
@@ -138,7 +138,7 @@ def _build_imagenet_dali_loader(root, is_training, image_size, mean, std, batch_
             .with_length(dataset_len)
         )
 
-        eii = WebDatasetExternalSource(DataLoader(dataset, num_workers=os.environ.get("WDS_PARALLEL_WORKER", 2),
+        eii = WebDatasetExternalSource(DataLoader(dataset, num_workers=int(os.environ.get("WDS_PARALLEL_WORKER", 2)),
                                                   batch_size=None, persistent_workers=True))
         reader = fn.external_source(source=eii, num_outputs=2)
     else:
