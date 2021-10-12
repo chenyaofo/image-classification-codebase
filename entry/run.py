@@ -19,7 +19,7 @@ from codebase.models import MODEL
 from codebase.optimizer import OPTIMIZER
 from codebase.scheduler import SCHEDULER
 from codebase.criterion import CRITERION
-from codebase.engine import train, evaluate
+from codebase.engine import train_one_epoch, evaluate_one_epoch
 
 from codebase.torchutils.common import set_cudnn_auto_tune, set_reproducible, generate_random_seed
 from codebase.torchutils.common import set_proper_device
@@ -74,7 +74,7 @@ def train_pipeline(
                 train_loader.sampler.set_epoch(epoch)
                 val_loader.sampler.set_epoch(epoch)
 
-        metrics += train(
+        metrics += train_one_epoch(
             epoch=epoch,
             model=model,
             loader=train_loader,
@@ -86,7 +86,7 @@ def train_pipeline(
             device=device,
             log_interval=log_interval
         )
-        metrics += evaluate(
+        metrics += evaluate_one_epoch(
             epoch=epoch,
             model=model,
             loader=val_loader,
@@ -186,7 +186,7 @@ def main_worker(local_rank: int,
         model = nn.parallel.DistributedDataParallel(model, device_ids=[local_rank])
 
     if conf.get_bool("only_evaluate"):
-        val_metrics = evaluate(
+        val_metrics = evaluate_one_epoch(
             epoch=0,
             model=model,
             loader=val_loader,

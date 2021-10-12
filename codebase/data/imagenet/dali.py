@@ -1,5 +1,5 @@
+import os
 import math
-import types as sys_types
 import warnings
 import logging
 import pathlib
@@ -21,7 +21,7 @@ try:
 except ImportError:
     warnings.warn("NVIDIA DALI library is unavailable, cannot load and preprocess dataset with DALI.")
 
-from .constants import WDS_SHUFFLE_BUFFER_SIZE
+from torch.utils.data import DataLoader
 from codebase.torchutils.distributed import world_size, rank
 from ..utils import glob_tars
 
@@ -30,11 +30,11 @@ _logger = logging.getLogger(__name__)
 
 
 class WebDatasetExternalSource:
-    def __init__(self, webdataset) -> None:
-        self.webdataset = webdataset
+    def __init__(self, source) -> None:
+        self.source = source
 
     def __iter__(self):
-        self._iter = iter(self.webdataset)
+        self._iter = iter(self.source)
         return self
 
     def __next__(self):
@@ -45,7 +45,7 @@ class WebDatasetExternalSource:
             raise StopIteration
 
     def __len__(self):
-        return len(self.webdataset)
+        return len(self.source)
 
     next = __next__
 
@@ -104,12 +104,31 @@ def create_dali_pipeline(reader, image_size, batch_size, mean, std, num_workers,
     return pipe
 
 
+class DALIWrapper:
+    def gen_wrapper(daliiterator):
+        for datas in daliiterator:
+            inputs = datas[0]["images"]
+            targets = datas[0]["targets"].squeeze(-1).long()
+            yield inputs, targets
+        # daliiterator.reset()
+
+    def __init__(self, daliiterator, _size=None):
+        self.daliiterator = daliiterator
+        self._size = _size
+
+    def __iter__(self):
+        return DALIWrapper.gen_wrapper(self.daliiterator)
+
+    def __len__(self):
+        return self._size if self._size is not None else len(self.daliiterator)
+
+
 def _build_imagenet_dali_loader(root, is_training, image_size, mean, std, batch_size, num_workers,
                                 use_webdataset, dataset_len=None, local_rank=None):
     if use_webdataset:
         dataset = (
             wds.WebDataset(glob_tars(pathlib.Path(root)/("train" if is_training else "val")))
-            .shuffle(WDS_SHUFFLE_BUFFER_SIZE if is_training else -1)
+            .shuffle(os.environ.get("WDS_BUFFER_SIZE", 5000) if is_training else -1)
             .to_tuple("jpg;png", "cls")
             .map_tuple(
                 lambda b: numpy.frombuffer(b, dtype=numpy.uint8),
@@ -118,7 +137,9 @@ def _build_imagenet_dali_loader(root, is_training, image_size, mean, std, batch_
             .batched(batch_size, collation_fn=lambda samples: [list(item) for item in zip(*samples)], partial=not is_training)
             .with_length(dataset_len)
         )
-        eii = WebDatasetExternalSource(dataset)
+
+        eii = WebDatasetExternalSource(DataLoader(dataset, num_workers=os.environ.get("WDS_PARALLEL_WORKER", 2),
+                                                  batch_size=None, persistent_workers=True))
         reader = fn.external_source(source=eii, num_outputs=2)
     else:
         reader = fn.readers.file(file_root=pathlib.Path(root)/("train" if is_training else "val"),
@@ -136,13 +157,17 @@ def _build_imagenet_dali_loader(root, is_training, image_size, mean, std, batch_
                                  dynamic_shape=True,
                                  last_batch_padded=use_webdataset,
                                  reader_name=None if use_webdataset else "Reader")
+
+    length = None
     if use_webdataset:
         if is_training:
             length = dataset_len // (world_size() * batch_size)
         else:
             length = math.ceil(dataset_len / (world_size() * batch_size))
-        loader.length = length
         _logger.info(f"Manually set loader.length to {length}")
+    
+    loader = DALIWrapper(loader, length)
+
     _logger.info(f"Loading ImageNet dataset using DALI from {'webdataset' if use_webdataset else 'folder'}"
                  f" with {'trainset' if is_training else 'valset'} (len={len(reader)})")
     if use_webdataset:
