@@ -15,7 +15,6 @@ import torchvision.transforms as T
 from torchvision.datasets import ImageFolder
 
 from ..utils import get_samplers, glob_tars
-from .constants import WDS_SHUFFLE_BUFFER_SIZE
 
 
 _logger = logging.getLogger(__name__)
@@ -43,7 +42,7 @@ def _build_imagenet_loader(root, is_training, image_size, mean, std, batch_size,
     if use_webdataset:
         dataset = (
             wds.WebDataset(glob_tars(pathlib.Path(root)/("train" if is_training else "val")))
-            .shuffle(WDS_SHUFFLE_BUFFER_SIZE if is_training else -1)
+            .shuffle(int(os.environ.get("WDS_BUFFER_SIZE", 5000)) if is_training else -1)
             .decode("pil")
             .to_tuple("jpg;png", "cls")
             .map_tuple(transforms, identity)
