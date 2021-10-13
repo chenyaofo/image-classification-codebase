@@ -144,8 +144,7 @@ def _build_imagenet_dali_loader(root, is_training, image_size, mean, std, batch_
                                  auto_reset=True,
                                  last_batch_policy=LastBatchPolicy.DROP if is_training else LastBatchPolicy.PARTIAL,
                                  dynamic_shape=True,
-                                 last_batch_padded=True,
-                                 reader_name="Reader")
+                                 last_batch_padded=True)
 
     length = None
     if use_tfrecord:
