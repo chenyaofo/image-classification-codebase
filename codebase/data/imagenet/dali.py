@@ -161,8 +161,8 @@ def _build_imagenet_dali_loader(root, is_training, image_size, mean, std, batch_
                 "*.idx"
             ),
             features={
-                "fname": tfrec.VarLenFeature((), tfrec.string, ""),
-                "image": tfrec.VarLenFeature((), tfrec.string, ""),
+                "fname": tfrec.FixedLenFeature((), tfrec.string, ""),
+                "image": tfrec.FixedLenFeature((), tfrec.string, ""),
                 "label": tfrec.FixedLenFeature([1], tfrec.int64,  -1),
             },
             shard_id=rank(),
