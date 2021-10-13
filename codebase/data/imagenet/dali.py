@@ -170,6 +170,12 @@ def _build_imagenet_dali_loader(root, is_training, image_size, mean, std, batch_
             random_shuffle=is_training,
             initial_fill=3000,
             pad_last_batch=False,
+            dont_use_mmap=True,  # If set to True, the Loader will use plain file I/O
+            # instead of trying to map the file in memory. Mapping provides a small
+            # performance benefit when accessing a local file system, but most network
+            # file systems, do not provide optimum performance.
+            prefetch_queue_depth=2,
+            read_ahead=True,
             name="Reader")
     else:
         reader = fn.readers.file(
