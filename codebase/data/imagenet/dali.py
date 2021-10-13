@@ -157,7 +157,7 @@ def _build_imagenet_dali_loader(root, is_training, image_size, mean, std, batch_
     loader = DALIWrapper(loader, length)
 
     _logger.info(f"Loading ImageNet dataset using DALI from {'tfrecord' if use_tfrecord else 'folder'}"
-                 f" with {'trainset' if is_training else 'valset'} (len={len(reader)})")
+                 f" with {'trainset' if is_training else 'valset'} (len={dataset_len if use_tfrecord else len(reader)})")
     if use_tfrecord:
         _logger.info("Note that the length of tfrecord is reported by user defined config file.")
     return loader
