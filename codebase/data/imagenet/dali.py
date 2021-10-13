@@ -1,17 +1,7 @@
-import os
 import math
 import warnings
 import logging
 import pathlib
-
-import numpy
-import torch
-from yaml import load
-
-try:
-    import webdataset as wds
-except ImportError:
-    warnings.warn("Webdataset library is unavailable, cannot load dataset with webdataset.")
 
 try:
     import nvidia.dali.types as types
@@ -22,33 +12,11 @@ try:
 except ImportError:
     warnings.warn("NVIDIA DALI library is unavailable, cannot load and preprocess dataset with DALI.")
 
-from torch.utils.data import DataLoader
 from codebase.torchutils.distributed import world_size, rank
-from ..utils import glob_tars, glob_by_suffix
+from ..utils import glob_by_suffix
 
 
 _logger = logging.getLogger(__name__)
-
-
-class WebDatasetExternalSource:
-    def __init__(self, source) -> None:
-        self.source = source
-
-    def __iter__(self):
-        self._iter = iter(self.source)
-        return self
-
-    def __next__(self):
-        try:
-            return next(self._iter)
-        except StopIteration:
-            self.__iter__()
-            raise StopIteration
-
-    def __len__(self):
-        return len(self.source)
-
-    next = __next__
 
 
 def create_dali_pipeline(reader, image_size, batch_size, mean, std, num_workers, local_rank,
@@ -130,27 +98,9 @@ class DALIWrapper:
 
 
 def _build_imagenet_dali_loader(root, is_training, image_size, mean, std, batch_size, num_workers,
-                                use_webdataset, use_tfrecord, dataset_len=None, local_rank=None):
+                                use_tfrecord, dataset_len=None, local_rank=None):
 
-    if use_webdataset and use_tfrecord:
-        raise ValueError("Detect flags 'use_webdataset' and 'use_tfrecord', these two flag can not be set to true at the same time.")
-    if use_webdataset:
-        dataset = (
-            wds.WebDataset(glob_tars(pathlib.Path(root)/("train" if is_training else "val")))
-            .shuffle(int(os.environ.get("WDS_BUFFER_SIZE", 5000)) if is_training else -1)
-            .to_tuple("jpg;png", "cls")
-            .map_tuple(
-                lambda b: numpy.frombuffer(b, dtype=numpy.uint8),
-                lambda v: torch.tensor([int(v.decode("utf-8"))])
-            )
-            .batched(batch_size, collation_fn=lambda samples: [list(item) for item in zip(*samples)], partial=not is_training)
-            .with_length(dataset_len)
-        )
-
-        eii = WebDatasetExternalSource(DataLoader(dataset, num_workers=int(os.environ.get("WDS_PARALLEL_WORKER", 2)),
-                                                  batch_size=None, persistent_workers=True))
-        reader = fn.external_source(source=eii, num_outputs=2)
-    elif use_tfrecord:
+    if use_tfrecord:
         reader = fn.readers.tfrecord(
             path=glob_by_suffix(
                 pathlib.Path(root)/("train" if is_training else "val"),
@@ -194,11 +144,11 @@ def _build_imagenet_dali_loader(root, is_training, image_size, mean, std, batch_
                                  auto_reset=True,
                                  last_batch_policy=LastBatchPolicy.DROP if is_training else LastBatchPolicy.PARTIAL,
                                  dynamic_shape=True,
-                                 last_batch_padded=use_webdataset,
-                                 reader_name=None if use_webdataset else "Reader")
+                                 last_batch_padded=True,
+                                 reader_name="Reader")
 
     length = None
-    if use_webdataset or use_tfrecord:
+    if use_tfrecord:
         if is_training:
             length = dataset_len // (world_size() * batch_size)
         else:
@@ -207,16 +157,16 @@ def _build_imagenet_dali_loader(root, is_training, image_size, mean, std, batch_
 
     loader = DALIWrapper(loader, length)
 
-    _logger.info(f"Loading ImageNet dataset using DALI from {'webdataset' if use_webdataset else 'folder'}"
+    _logger.info(f"Loading ImageNet dataset using DALI from {'tfrecord' if use_tfrecord else 'folder'}"
                  f" with {'trainset' if is_training else 'valset'} (len={len(reader)})")
-    if use_webdataset or use_tfrecord:
-        _logger.info("Note that the length of webdataset is reported by user defined config file.")
+    if use_tfrecord:
+        _logger.info("Note that the length of tfrecord is reported by user defined config file.")
     return loader
 
 
 def build_imagenet_dali_loader(root, image_size, mean, std, batch_size, num_workers,
-                               use_webdataset, use_tfrecord, trainset_len, valset_len, local_rank):
+                               use_tfrecord, trainset_len, valset_len, local_rank):
     return _build_imagenet_dali_loader(root, True, image_size, mean, std, batch_size, num_workers,
-                                       use_webdataset, use_tfrecord, trainset_len, local_rank),\
+                                       use_tfrecord, trainset_len, local_rank),\
         _build_imagenet_dali_loader(root, False, image_size, mean, std, batch_size, num_workers,
-                                    use_webdataset, use_tfrecord, valset_len, local_rank)
+                                    use_tfrecord, valset_len, local_rank)
