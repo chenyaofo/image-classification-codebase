@@ -18,12 +18,13 @@ try:
     import nvidia.dali.fn as fn
     from nvidia.dali.plugin.pytorch import DALIGenericIterator, LastBatchPolicy
     from nvidia.dali.pipeline import Pipeline
+    import nvidia.dali.tfrecord as tfrec
 except ImportError:
     warnings.warn("NVIDIA DALI library is unavailable, cannot load and preprocess dataset with DALI.")
 
 from torch.utils.data import DataLoader
 from codebase.torchutils.distributed import world_size, rank
-from ..utils import glob_tars
+from ..utils import glob_tars, glob_by_suffix
 
 
 _logger = logging.getLogger(__name__)
@@ -50,11 +51,16 @@ class WebDatasetExternalSource:
     next = __next__
 
 
-def create_dali_pipeline(reader, image_size, batch_size, mean, std, num_workers, local_rank, dali_cpu=False, is_training=True):
+def create_dali_pipeline(reader, image_size, batch_size, mean, std, num_workers, local_rank,
+                         use_tfrecord, dali_cpu=False, is_training=True):
     # refer to https://github.com/NVIDIA/DALI/blob/54034c4ddd7cfe2b6dda7e8cec5f91ae18f7ad39/docs/examples/use_cases/pytorch/resnet50/main.py
     pipe = Pipeline(batch_size, num_workers, device_id=local_rank)
     with pipe:
-        images, labels = reader
+        if use_tfrecord:
+            images = reader["image"]
+            labels = reader["label"]
+        else:
+            images, labels = reader
         # images, labels = fn.external_source(source=eii, num_outputs=2)
         dali_device = 'cpu' if dali_cpu else 'gpu'
         decoder_device = 'cpu' if dali_cpu else 'mixed'
@@ -124,7 +130,10 @@ class DALIWrapper:
 
 
 def _build_imagenet_dali_loader(root, is_training, image_size, mean, std, batch_size, num_workers,
-                                use_webdataset, dataset_len=None, local_rank=None):
+                                use_webdataset, use_tfrecord, dataset_len=None, local_rank=None):
+
+    if use_webdataset and use_tfrecord:
+        raise ValueError("Detect flags 'use_webdataset' and 'use_tfrecord', these two flag can not be set to true at the same time.")
     if use_webdataset:
         dataset = (
             wds.WebDataset(glob_tars(pathlib.Path(root)/("train" if is_training else "val")))
@@ -141,14 +150,38 @@ def _build_imagenet_dali_loader(root, is_training, image_size, mean, std, batch_
         eii = WebDatasetExternalSource(DataLoader(dataset, num_workers=int(os.environ.get("WDS_PARALLEL_WORKER", 2)),
                                                   batch_size=None, persistent_workers=True))
         reader = fn.external_source(source=eii, num_outputs=2)
+    elif use_tfrecord:
+        reader = fn.readers.file(
+            path=glob_by_suffix(
+                pathlib.Path(root)/("train" if is_training else "val"),
+                "*.tfrecord"
+            ),
+            index_path=glob_by_suffix(
+                pathlib.Path(root)/("train" if is_training else "val"),
+                "*.idx"
+            ),
+            features={
+                "fname": tfrec.VarLenFeature((), tfrec.string, ""),
+                "image": tfrec.VarLenFeature((), tfrec.string, ""),
+                "label": tfrec.FixedLenFeature([1], tfrec.int64,  -1),
+            },
+            shard_id=rank(),
+            num_shards=world_size(),
+            random_shuffle=is_training,
+            initial_fill=3000,
+            pad_last_batch=False,
+            name="Reader")
     else:
-        reader = fn.readers.file(file_root=pathlib.Path(root)/("train" if is_training else "val"),
-                                 shard_id=rank(),
-                                 num_shards=world_size(),
-                                 random_shuffle=is_training,
-                                 pad_last_batch=False,
-                                 name="Reader")
-    pipe = create_dali_pipeline(reader, image_size, batch_size, mean, std, num_workers, local_rank, is_training=is_training)
+        reader = fn.readers.file(
+            file_root=pathlib.Path(root)/("train" if is_training else "val"),
+            shard_id=rank(),
+            num_shards=world_size(),
+            random_shuffle=is_training,
+            pad_last_batch=False,
+            name="Reader"
+        )
+    pipe = create_dali_pipeline(reader, image_size, batch_size, mean, std, num_workers, local_rank,
+                                use_tfrecord=use_tfrecord, is_training=is_training)
     loader = DALIGenericIterator(pipe,
                                  output_map=["images", "targets"],
                                  #  size = dataset_len if use_webdataset else -1,
@@ -159,25 +192,25 @@ def _build_imagenet_dali_loader(root, is_training, image_size, mean, std, batch_
                                  reader_name=None if use_webdataset else "Reader")
 
     length = None
-    if use_webdataset:
+    if use_webdataset or use_tfrecord:
         if is_training:
             length = dataset_len // (world_size() * batch_size)
         else:
             length = math.ceil(dataset_len / (world_size() * batch_size))
         _logger.info(f"Manually set loader.length to {length}")
-    
+
     loader = DALIWrapper(loader, length)
 
     _logger.info(f"Loading ImageNet dataset using DALI from {'webdataset' if use_webdataset else 'folder'}"
                  f" with {'trainset' if is_training else 'valset'} (len={len(reader)})")
-    if use_webdataset:
+    if use_webdataset or use_tfrecord:
         _logger.info("Note that the length of webdataset is reported by user defined config file.")
     return loader
 
 
 def build_imagenet_dali_loader(root, image_size, mean, std, batch_size, num_workers,
-                               use_webdataset, trainset_len, valset_len, local_rank):
+                               use_webdataset, use_tfrecord, trainset_len, valset_len, local_rank):
     return _build_imagenet_dali_loader(root, True, image_size, mean, std, batch_size, num_workers,
-                                       use_webdataset, trainset_len, local_rank),\
+                                       use_webdataset, use_tfrecord, trainset_len, local_rank),\
         _build_imagenet_dali_loader(root, False, image_size, mean, std, batch_size, num_workers,
-                                    use_webdataset, valset_len, local_rank)
+                                    use_webdataset, use_tfrecord, valset_len, local_rank)
