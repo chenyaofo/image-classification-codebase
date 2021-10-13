@@ -66,7 +66,7 @@ To list all valid hyperparameters names, you can run the following command:
 pyhocon -i conf/cifar10.conf -f properties
 ```
 
-3. We use NVIDIA DALI to accelerate the data preprocessing on ImageNet (use it by the flag `data.use_dali`) and webdataset tarfile format to store the ImageNet (create the tarfiles by `tools/make_wds.py` and use it by the flag `data.use_webdataset`).
+3. We use NVIDIA DALI to accelerate the data preprocessing on ImageNet (use it by the flag `data.use_dali`) and tfrecord format to store the ImageNet (create the tfrecords by `tools/make_tfrecord.py` and use it by the flag `data.use_tfrecord`).
 
 
 Finally, enjoy the code.
