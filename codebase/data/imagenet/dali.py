@@ -151,7 +151,7 @@ def _build_imagenet_dali_loader(root, is_training, image_size, mean, std, batch_
                                                   batch_size=None, persistent_workers=True))
         reader = fn.external_source(source=eii, num_outputs=2)
     elif use_tfrecord:
-        reader = fn.readers.file(
+        reader = fn.readers.tfrecord(
             path=glob_by_suffix(
                 pathlib.Path(root)/("train" if is_training else "val"),
                 "*.tfrecord"
