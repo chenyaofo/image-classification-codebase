@@ -1,4 +1,3 @@
-import math
 import warnings
 import logging
 import pathlib
@@ -79,26 +78,25 @@ def create_dali_pipeline(reader, image_size, batch_size, mean, std, num_workers,
 
 
 class DALIWrapper:
-    def gen_wrapper(daliiterator):
-        for datas in daliiterator:
-            inputs = datas[0]["images"]
-            targets = datas[0]["targets"].squeeze(-1).long()
-            yield inputs, targets
-        # daliiterator.reset()
-
-    def __init__(self, daliiterator, _size=None):
+    def __init__(self, daliiterator):
         self.daliiterator = daliiterator
-        self._size = _size
 
     def __iter__(self):
-        return DALIWrapper.gen_wrapper(self.daliiterator)
+        self._iter = iter(self.daliiterator)
+        return self
+
+    def __next__(self):
+        datas = next(self._iter)
+        inputs = datas[0]["images"]
+        targets = datas[0]["targets"].squeeze(-1).long()
+        return inputs, targets
 
     def __len__(self):
-        return self._size if self._size is not None else len(self.daliiterator)
+        return len(self.daliiterator)
 
 
 def _build_imagenet_dali_loader(root, is_training, image_size, mean, std, batch_size, num_workers,
-                                use_tfrecord, dataset_len=None, local_rank=None):
+                                use_tfrecord, local_rank=None):
 
     if use_tfrecord:
         reader = fn.readers.tfrecord(
@@ -119,7 +117,7 @@ def _build_imagenet_dali_loader(root, is_training, image_size, mean, std, batch_
             num_shards=world_size(),
             random_shuffle=is_training,
             initial_fill=3000,
-            pad_last_batch=False,
+            pad_last_batch=True,
             dont_use_mmap=True,  # If set to True, the Loader will use plain file I/O
             # instead of trying to map the file in memory. Mapping provides a small
             # performance benefit when accessing a local file system, but most network
@@ -133,39 +131,28 @@ def _build_imagenet_dali_loader(root, is_training, image_size, mean, std, batch_
             shard_id=rank(),
             num_shards=world_size(),
             random_shuffle=is_training,
-            pad_last_batch=False,
+            pad_last_batch=True,
             name="Reader"
         )
     pipe = create_dali_pipeline(reader, image_size, batch_size, mean, std, num_workers, local_rank,
                                 use_tfrecord=use_tfrecord, is_training=is_training)
     loader = DALIGenericIterator(pipe,
                                  output_map=["images", "targets"],
-                                 #  size = dataset_len if use_webdataset else -1,
                                  auto_reset=True,
                                  last_batch_policy=LastBatchPolicy.DROP if is_training else LastBatchPolicy.PARTIAL,
-                                 dynamic_shape=True,
-                                 last_batch_padded=True)
+                                 reader_name="Reader")
 
-    length = None
-    if use_tfrecord:
-        if is_training:
-            length = dataset_len // (world_size() * batch_size)
-        else:
-            length = math.ceil(dataset_len / (world_size() * batch_size))
-        _logger.info(f"Manually set loader.length to {length}")
-
-    loader = DALIWrapper(loader, length)
+    loader = DALIWrapper(loader)
 
     _logger.info(f"Loading ImageNet dataset using DALI from {'tfrecord' if use_tfrecord else 'folder'}"
-                 f" with {'trainset' if is_training else 'valset'} (len={dataset_len if use_tfrecord else len(reader)})")
-    if use_tfrecord:
-        _logger.info("Note that the length of tfrecord is reported by user defined config file.")
+                 f" with {'trainset' if is_training else 'valset'} (len={pipe.reader_meta()['Reader']['epoch_size']})")
+    _logger.info(f"Total batch_size={batch_size*world_size()} with world_size={world_size()}, run with {len(loader)} iters per epoch")
     return loader
 
 
 def build_imagenet_dali_loader(root, image_size, mean, std, batch_size, num_workers,
-                               use_tfrecord, trainset_len, valset_len, local_rank):
+                               use_tfrecord, local_rank):
     return _build_imagenet_dali_loader(root, True, image_size, mean, std, batch_size, num_workers,
-                                       use_tfrecord, trainset_len, local_rank),\
+                                       use_tfrecord, local_rank),\
         _build_imagenet_dali_loader(root, False, image_size, mean, std, batch_size, num_workers,
-                                    use_tfrecord, valset_len, local_rank)
+                                    use_tfrecord, local_rank)

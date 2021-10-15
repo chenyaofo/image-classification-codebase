@@ -25,7 +25,7 @@ def get_train_transforms(crop_size, mean, std, is_training):
     return T.Compose(pipelines)
 
 
-def _build_imagenet_loader(root, is_training, image_size, mean, std, batch_size, num_workers, use_webdataset, dataset_len=None):
+def _build_imagenet_loader(root, is_training, image_size, mean, std, batch_size, num_workers):
     transforms = get_train_transforms(image_size, mean, std, is_training)
 
     dataset = ImageFolder(pathlib.Path(root)/("train" if is_training else "val"), transform=transforms)
@@ -38,10 +38,11 @@ def _build_imagenet_loader(root, is_training, image_size, mean, std, batch_size,
                              drop_last=is_training)
     _logger.info(f"Loading ImageNet dataset using torchvision from folder"
                  f" with {'trainset' if is_training else 'valset'} (len={len(dataset)})")
+    _logger.info(f"Total batch_size={batch_size*world_size()} with world_size={world_size()}, run with {len(loader)} iters per epoch")
+
     return loader
 
 
-def build_imagenet_loader(root, image_size, mean, std, batch_size, num_workers,
-                          trainset_len, valset_len):
-    return _build_imagenet_loader(root, True, image_size, mean, std, batch_size, num_workers, trainset_len),\
-        _build_imagenet_loader(root, False, image_size, mean, std, batch_size, num_workers, valset_len)
+def build_imagenet_loader(root, image_size, mean, std, batch_size, num_workers):
+    return _build_imagenet_loader(root, True, image_size, mean, std, batch_size, num_workers),\
+        _build_imagenet_loader(root, False, image_size, mean, std, batch_size, num_workers)

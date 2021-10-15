@@ -6,10 +6,9 @@ from ..register import DATA
 
 @DATA.register
 def imagenet2012(root, image_size, mean, std, batch_size, num_workers, use_dali,
-                 use_tfrecord, trainset_len, valset_len, local_rank, **kwargs):
+                 use_tfrecord, local_rank, **kwargs):
     if use_dali:
         return build_imagenet_dali_loader(root, image_size, mean, std, batch_size, num_workers,
-                                          use_tfrecord, trainset_len, valset_len, local_rank)
+                                          use_tfrecord, local_rank)
     else:
-        return build_imagenet_loader(root, image_size, mean, std, batch_size, num_workers,
-                                     trainset_len, valset_len)
+        return build_imagenet_loader(root, image_size, mean, std, batch_size, num_workers)
