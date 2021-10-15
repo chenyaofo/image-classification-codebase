@@ -1,5 +1,6 @@
 import logging
 import dataclasses
+import pathlib
 import pprint
 
 import torch
@@ -32,7 +33,7 @@ from codebase.torchutils.common import DummyClass
 from codebase.torchutils.common import find_best_metric
 from codebase.torchutils.distributed import is_dist_avail_and_init, is_master, world_size
 from codebase.torchutils.metrics import EstimatedTimeArrival
-from codebase.torchutils.logging_ import init_logger
+from codebase.torchutils.logging_ import init_logger, create_code_snapshot
 
 
 _logger = logging.getLogger(__name__)
@@ -118,6 +119,13 @@ def main_worker(local_rank: int,
                 conf: ConfigTree):
     device = set_proper_device(local_rank)
 
+    rank = args.node_rank*ngpus_per_node+local_rank
+    init_logger(rank=rank, filenmae=args.output_dir/"default.log")
+    if pathlib.Path(args.output_dir).exists():
+        _logger.info("-"*50)
+        _logger.info("Resume from last training checkpoints.")
+        _logger.info("-"*50)
+
     if conf.get("set_reproducible"):
         seed = generate_random_seed()
         set_reproducible(seed)
@@ -125,14 +133,15 @@ def main_worker(local_rank: int,
     else:
         set_cudnn_auto_tune()
 
-    rank = args.node_rank*ngpus_per_node+local_rank
-    init_logger(rank=rank, filenmae=args.output_dir/"default.log")
+    if is_master():
+        create_code_snapshot(name="code", include_suffix=[".py", ".conf"],
+                             source_directory=".", store_directory=args.output_dir)
     writer = SummaryWriter(args.output_dir) if is_master() else DummyClass()
 
     # log some diagnostic messages
-    if not conf.get_bool("only_evaluate"):
-        _logger.info("Collect envs from system:\n" + get_pretty_env_info())
-        _logger.info("Args:\n" + pprint.pformat(dataclasses.asdict(args)))
+    # if not conf.get_bool("only_evaluate"):
+    _logger.info("Collect envs from system:\n" + get_pretty_env_info())
+    _logger.info("Args:\n" + pprint.pformat(dataclasses.asdict(args)))
 
     # init distribited
     if args.world_size > 1:
