@@ -62,6 +62,7 @@ def train_pipeline(
     use_amp: bool,
     accmulated_steps: int,
     device: str,
+    memory_format: str,
     log_interval: int,
     writer: SummaryWriter,
     saver: ModelSaver,
@@ -85,14 +86,17 @@ def train_pipeline(
             use_amp=use_amp,
             accmulated_steps=accmulated_steps,
             device=device,
+            memory_format=memory_format,
             log_interval=log_interval
         )
+
         metrics += evaluate_one_epoch(
             epoch=epoch,
             model=model,
             loader=val_loader,
             criterion=criterion,
             device=device,
+            memory_format=memory_format,
             log_interval=log_interval
         )
 
@@ -131,6 +135,7 @@ def main_worker(local_rank: int,
         set_reproducible(seed)
         _logger.info(f"Set the training to be reproducible with seed={seed}")
     else:
+        _logger.info(f"Set torch.backends.cudnn.benchmark=True")
         set_cudnn_auto_tune()
 
     if is_master():
@@ -175,7 +180,7 @@ def main_worker(local_rank: int,
     scheduler = SCHEDULER.build_from(conf.get("scheduler"), dict(optimizer=optimizer))
 
     if torch.cuda.is_available():
-        model = model.to(device=device)
+        model = model.to(device=device, memory_format=getattr(torch, conf.get("memory_format")))
         criterion = criterion.to(device=device)
 
     # restore metrics, model, optimizer and scheduler state of the checkpoint
@@ -201,6 +206,7 @@ def main_worker(local_rank: int,
             loader=val_loader,
             criterion=criterion,
             device=device,
+            memory_format=getattr(torch, conf.get("memory_format")),
             log_interval=conf.get_int("log_interval")
         )
         _logger.info(f"EVAL complete, top1-acc={val_metrics['val/top1_acc']*100:.2f}%, " +
@@ -219,6 +225,7 @@ def main_worker(local_rank: int,
             use_amp=conf.get_bool("use_amp"),
             accmulated_steps=conf.get_int("accmulated_steps"),
             device=device,
+            memory_format=getattr(torch, conf.get("memory_format")),
             log_interval=conf.get_int("log_interval"),
             writer=writer,
             saver=saver,

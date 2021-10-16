@@ -208,24 +208,19 @@ class GradientAccumulator:
             return
 
         loss = loss / self.steps
-        if scaler is not None:
-            loss = scaler.scale(loss)
 
         if self.is_start_cycle:
             optimizer.zero_grad()
 
         if isinstance(model, nn.parallel.DistributedDataParallel) and not self.is_end_cycle:
             with model.no_sync():
-                loss.backward()
+                scaler.scale(loss).backward()
         else:
-            loss.backward()
+            scaler.scale(loss).backward()
 
         if self.is_end_cycle:
-            if scaler is None:
-                optimizer.step()
-            else:
-                scaler.step(optimizer)
-                scaler.update()
+            scaler.step(optimizer)
+            scaler.update()
 
         self.inc_counter()
 

@@ -1,6 +1,4 @@
-import math
 import logging
-
 
 import torch
 import torch.nn as nn
@@ -15,6 +13,8 @@ from codebase.torchutils.common import SpeedTester, time_enumerate
 
 _logger = logging.getLogger(__name__)
 
+scaler = None
+
 
 def train_one_epoch(epoch: int,
                     model: nn.Module,
@@ -26,10 +26,14 @@ def train_one_epoch(epoch: int,
                     use_amp: bool,
                     accmulated_steps: int,
                     device: str,
+                    memory_format: str,
                     log_interval: int):
     model.train()
 
-    scaler = GradScaler() if use_amp else None
+    # scaler = GradScaler(enabled=use_amp)
+    global scaler
+    if scaler is None:
+        scaler = GradScaler(enabled=use_amp)
 
     gradident_accumulator = GradientAccumulator(accmulated_steps)
 
@@ -46,9 +50,8 @@ def train_one_epoch(epoch: int,
     _logger.info(f"Train start, epoch={epoch:04d}, lr={lr:.6f}")
 
     for time_cost, iter_, (inputs, targets) in time_enumerate(loader, start=1):
-        inputs, targets = inputs.to(device=device, non_blocking=True), targets.to(device=device, non_blocking=True)
-
-        optimizer.zero_grad()
+        inputs = inputs.to(device=device, non_blocking=True, memory_format=memory_format)
+        targets = targets.to(device=device, non_blocking=True)
 
         with autocast(enabled=use_amp):
             outputs = model(inputs)
@@ -89,6 +92,7 @@ def evaluate_one_epoch(epoch: int,
                        loader: data.DataLoader,
                        criterion: nn.modules.loss._Loss,
                        device: str,
+                       memory_format: str,
                        log_interval: int):
     model.eval()
 
@@ -99,7 +103,8 @@ def evaluate_one_epoch(epoch: int,
     speed_tester = SpeedTester()
 
     for time_cost, iter_, (inputs, targets) in time_enumerate(loader, start=1):
-        inputs, targets = inputs.to(device=device, non_blocking=True), targets.to(device=device, non_blocking=True)
+        inputs = inputs.to(device=device, non_blocking=True, memory_format=memory_format)
+        targets = targets.to(device=device, non_blocking=True)
 
         with torch.no_grad():
             outputs = model(inputs)
