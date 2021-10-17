@@ -59,6 +59,12 @@ def set_cudnn_auto_tune() -> None:
     torch.backends.cudnn.benchmark = True
 
 
+def disable_debug_api() -> None:
+    torch.autograd.set_detect_anomaly(False)
+    torch.autograd.profiler.profile(False)
+    torch.autograd.profiler.emit_nvtx(False)
+
+
 def compute_nparam(module: nn.Module) -> int:
     """Count how many parameter in a module. Note that the buffer in the module will not
     be counted.
@@ -210,7 +216,8 @@ class GradientAccumulator:
         loss = loss / self.steps
 
         if self.is_start_cycle:
-            optimizer.zero_grad()
+            # if pytorch version >= 1.7, set set_to_none=True for better performance
+            optimizer.zero_grad(set_to_none=True)
 
         if isinstance(model, nn.parallel.DistributedDataParallel) and not self.is_end_cycle:
             with model.no_sync():

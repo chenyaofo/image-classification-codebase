@@ -22,7 +22,7 @@ from codebase.scheduler import SCHEDULER
 from codebase.criterion import CRITERION
 from codebase.engine import train_one_epoch, evaluate_one_epoch
 
-from codebase.torchutils.common import set_cudnn_auto_tune, set_reproducible, generate_random_seed
+from codebase.torchutils.common import set_cudnn_auto_tune, set_reproducible, generate_random_seed, disable_debug_api
 from codebase.torchutils.common import set_proper_device
 from codebase.torchutils.common import unwarp_module
 from codebase.torchutils.common import compute_nparam, compute_flops
@@ -125,7 +125,7 @@ def main_worker(local_rank: int,
 
     rank = args.node_rank*ngpus_per_node+local_rank
     init_logger(rank=rank, filenmae=args.output_dir/"default.log")
-    if pathlib.Path(args.output_dir).exists():
+    if (pathlib.Path(args.output_dir)/"checkpoint.pt").exists():
         _logger.info("-"*50)
         _logger.info("Resume from last training checkpoints.")
         _logger.info("-"*50)
@@ -137,6 +137,8 @@ def main_worker(local_rank: int,
     else:
         _logger.info(f"Set torch.backends.cudnn.benchmark=True")
         set_cudnn_auto_tune()
+        _logger.info("Disable debug api.")
+        disable_debug_api()
 
     if is_master():
         create_code_snapshot(name="code", include_suffix=[".py", ".conf"],
