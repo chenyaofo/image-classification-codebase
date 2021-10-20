@@ -26,7 +26,7 @@ def patch_OpenPAI_env() -> None:
             os.environ["LOCAL_RANK"] = str(0)
 
 
-def distributed_init(backend: str = "nccl", init_method: str = "env://") -> typing.Tuple[str, str, int, int, int, str, str]:
+def _distributed_init(backend: str = "nccl", init_method: str = "env://") -> typing.Tuple[str, str, int, int, int, str, str]:
     """Quickly initialize the distributed mode in PyTorch by getting informations from environment variables and
     send these to dist.init_process_group.
 
@@ -60,6 +60,14 @@ def distributed_init(backend: str = "nccl", init_method: str = "env://") -> typi
         else:
             print("Fail to init distributed because torch.distributed is unavailable.")
         return None, None, 0, 0, 1, None, None
+
+
+def distributed_init(dist_backend, init_method, world_size, rank):
+    if world_size <= 0:
+        raise ValueError(f"'world_size' should be greater than zero, but got {world_size}")
+    if world_size > 1:
+        dist.init_process_group(backend=dist_backend, init_method=init_method,
+                                world_size=world_size, rank=rank)
 
 
 def is_dist_avail_and_init() -> bool:
