@@ -13,13 +13,17 @@ class SyntheticDataLoader:
         self.targets = torch.randint(0, num_classes, target_size, device=device, dtype=torch.long)
 
     def __iter__(self):
+        self.n = 0
         return self
 
     def __next__(self):
+        self.n += 1
+        if self.n == len(self):
+            raise StopIteration
         return self.images, self.targets
 
     def __len__(self):
-        return 10 ^ 6
+        return 100
 
 
 @DATA.register
