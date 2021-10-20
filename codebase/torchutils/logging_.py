@@ -5,6 +5,7 @@ import logging
 import glob
 import zipfile
 
+from .distributed import is_master
 
 _logger = logging.getLogger(__name__)
 
@@ -49,9 +50,10 @@ def create_code_snapshot(name: str,
                          include_suffix: typing.List[str],
                          source_directory: str,
                          store_directory: str) -> None:
-    if store_directory is None:
-        return
-    with zipfile.ZipFile(os.path.join(store_directory, "{}.zip".format(name)), "w") as f:
-        for suffix in include_suffix:
-            for file in glob.glob(os.path.join(source_directory, "**", "*{}".format(suffix)), recursive=True):
-                f.write(file, os.path.join(name, file))
+    if is_master():
+        if store_directory is None:
+            return
+        with zipfile.ZipFile(os.path.join(store_directory, "{}.zip".format(name)), "w") as f:
+            for suffix in include_suffix:
+                for file in glob.glob(os.path.join(source_directory, "**", "*{}".format(suffix)), recursive=True):
+                    f.write(file, os.path.join(name, file))
