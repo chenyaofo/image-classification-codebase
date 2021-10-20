@@ -38,8 +38,8 @@ class Args(TypedArgs):
     node_rank: int = add_argument("--node-rank", default=0)
 
 
-def get_args():
-    args, _ = Args.from_known_args(sys.argv)
+def get_args(argv=sys.argv):
+    args, _ = Args.from_known_args(argv)
     args.output_dir = pathlib.Path(args.output_dir)
 
     if args.dist_url is None:
@@ -48,7 +48,7 @@ def get_args():
         args.dist_url = f"tcp://{args.dist_url}:{get_free_port()}"
 
     args.conf = ConfigFactory.parse_file(args.conf)
-    args.output_dir.mkdir(parents=True, exist_ok=args.conf.get_bool("auto_resume"))
+    args.output_dir.mkdir(parents=True, exist_ok=True)
 
     if args.modifications is not None:
         for modifition in args.modifications:

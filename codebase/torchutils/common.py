@@ -1,4 +1,5 @@
 import os
+import logging
 import time
 import copy
 import socket
@@ -16,8 +17,11 @@ import torch.hub as hub
 import torch.nn as nn
 import torch.optim as optim
 import torch.cuda.amp as amp
+import torch.backends.cudnn
 
 from .distributed import torchsave, is_master
+
+_logger = logging.getLogger(__name__)
 
 
 def is_running_in_openpai() -> bool:
@@ -51,18 +55,23 @@ def set_reproducible(seed: int = 0) -> None:
     torch.manual_seed(seed)
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
+    _logger.info(f"Set the training job to be reproducible with seed={seed} "
+                 "(more detailed can be found at https://pytorch.org/docs/stable/notes/randomness.html)")
 
 
 def set_cudnn_auto_tune() -> None:
     """A wrap to set torch.backends.cudnn.benchmark to True.
     """
     torch.backends.cudnn.benchmark = True
+    _logger.info(f"Set torch.backends.cudnn.benchmark=True")
 
 
 def disable_debug_api() -> None:
     torch.autograd.set_detect_anomaly(False)
     torch.autograd.profiler.profile(False)
     torch.autograd.profiler.emit_nvtx(False)
+    _logger.info(f"Disable the debug api for better performance: torch.autograd.set_detect_anomaly, "
+                 "torch.autograd.profiler.profile, and torch.autograd.profiler.emit_nvtx")
 
 
 def compute_nparam(module: nn.Module) -> int:
@@ -188,8 +197,9 @@ def get_free_port() -> int:
 
 
 class GradientAccumulator:
-    def __init__(self, steps=1):
+    def __init__(self, steps=1, enabled=True):
         self.steps = steps
+        self.enable = enabled
         self._counter = 0
 
     @property
@@ -210,6 +220,8 @@ class GradientAccumulator:
 
     def backward_step(self, model: nn.Module, loss: torch.Tensor,
                       optimizer: optim.Optimizer, scaler: amp.GradScaler):
+        if not self.enable:
+            return
         if optimizer is None:
             return
 
@@ -336,56 +348,83 @@ def patch_download_in_cn():
     hub.download_url_to_file = _cn_download_url_to_file
 
 
-class ModelSaver:
-    def __init__(self, output_directory: pathlib.Path) -> None:
-        self.output_directory = output_directory
+class MetricsStore(collections.defaultdict):
+    def __init__(self, dominant_metric_name: str = None, max_is_best: bool = True):
+        super(MetricsStore, self).__init__(list)
+        self.dominant_metric_name = dominant_metric_name
+        self.max_is_best = max_is_best
+        self.try_to_find = max if self.max_is_best else min
 
-    @only_master
-    def save(self, minitor: str, metrics: dict, states: dict):
-        checkpoint = {k: v.state_dict() for k, v in states.items() if hasattr(v, "state_dict")}
-        checkpoint["metrics"] = metrics
+    def set_dominant_metric(self, dominant_metric: str):
+        self.dominant_metric_name = dominant_metric
 
-        torchsave(checkpoint, self.output_directory / "checkpoint.pt")
+    @property
+    def best_epoch(self) -> int:
+        try:
+            dominant_metrics = self.get(self.dominant_metric_name)
+        except KeyError:
+            raise KeyError("The dominant_metric_name={dominant_metric_name} are not found in the store.")
+        return dominant_metrics.index(self.try_to_find(dominant_metrics))
 
-        *history_metrics, last_metric = metrics[minitor]
-        if all([last_metric > m for m in history_metrics]):
-            torchsave(checkpoint, self.output_directory / "best_checkpoint.pt")
+    def get_best_metrics(self, key_filter=lambda x: True):
+        return self._get_metrics(self.best_epoch, key_filter)
 
-    def restore(self, metrics: dict, states: dict, device="cuda:0"):
-        checkpoint_path = self.output_directory / "checkpoint.pt"
-        if checkpoint_path.exists():
-            map_location = f"cuda:{device}" if isinstance(device, int) else device
-            checkpoint: dict = torch.load(checkpoint_path, map_location=map_location)
-            metrics.update(checkpoint.pop("metrics", dict()))
-            for name, module in states.items():
-                if hasattr(module, "load_state_dict"):
-                    module.load_state_dict(checkpoint[name])
+    def get_last_metrics(self, key_filter=lambda x: True):
+        return self._get_metrics(-1, key_filter)
 
+    def is_best_epoch(self):
+        return self.best_epoch == len(self) - 1
 
-class MetricsList(collections.defaultdict):
-    def __init__(self):
-        super(MetricsList, self).__init__(list)
+    def _get_metrics(self, index, key_filter=lambda x: True):
+        return {k: v[index] for k, v in self.items() if key_filter(k)}
 
     def __add__(self, another_metrics: dict):
         for k, v in another_metrics.items():
             self[k].append(v)
         return self
 
+    @property
+    def total_epoch(self):
+        for k, v in self.items():
+            return len(v)
+        return 0
+
     def as_plain_dict(self):
         return {k: v for k, v in self.items()}
 
 
-def find_best_metric(metrics, larger_is_better=True):
-    best_index, best_metric = 0, metrics[0]
-    for i, metric in enumerate(metrics):
-        if (larger_is_better and metric > best_metric) or \
-                (not larger_is_better and metric < best_metric):
-            best_metric = metric
-            best_index = i
-    return best_index, best_metric
+class StateCheckPoint:
+    def __init__(self, output_directory: pathlib.Path, checkpoint_name: str = "checkpoint.pt") -> None:
+        self.output_directory = output_directory
+        self.checkpoint_name = checkpoint_name
+        self.best_checkpoint_name = f"best_{self.checkpoint_name}"
+
+    def is_ckpt_exists(self):
+        return (self.output_directory / self.checkpoint_name).exists()
+
+    @only_master
+    def save(self, metric_store: MetricsStore, states: dict):
+        checkpoint = {k: v.state_dict() for k, v in states.items() if hasattr(v, "state_dict")}
+        checkpoint["metrics"] = metric_store.as_plain_dict()
+
+        torchsave(checkpoint, self.output_directory / self.checkpoint_name)
+
+        if metric_store.is_best_epoch():
+            os.link(self.output_directory / self.checkpoint_name, self.output_directory / self.best_checkpoint_name)
+
+    def restore(self, metric_store: MetricsStore, states: dict, device="cuda:0"):
+        checkpoint_path = self.output_directory / self.checkpoint_name
+        if checkpoint_path.exists():
+            map_location = f"cuda:{device}" if isinstance(device, int) else device
+            checkpoint: dict = torch.load(checkpoint_path, map_location=map_location)
+            metric_store.update(checkpoint.pop("metrics", dict()))
+            for name, module in states.items():
+                if hasattr(module, "load_state_dict"):
+                    module.load_state_dict(checkpoint[name])
+            _logger.info(f"Load state checkpoint from {checkpoint_path} at epoch={metric_store.total_epoch}")
 
 
-class SpeedTester():
+class ThroughputTester():
     def __init__(self):
         self.reset()
 
@@ -424,10 +463,18 @@ class time_enumerate:
             return end_time-start_time, self.counter, item
 
 
+CURRENT_DEVICE = None
+
+
 def set_proper_device(local_rank: int):
+    global CURRENT_DEVICE
     if torch.cuda.is_available():
         torch.cuda.set_device(local_rank)
-        device = torch.cuda.current_device()
+        CURRENT_DEVICE = torch.cuda.current_device()
     else:
-        device = "cpu"
-    return device
+        CURRENT_DEVICE = "cpu"
+
+
+def get_device():
+    global CURRENT_DEVICE
+    return CURRENT_DEVICE
