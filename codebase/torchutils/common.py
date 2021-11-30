@@ -343,7 +343,7 @@ def patch_download_in_cn():
 
     def _cn_download_url_to_file(url: str, dst, hash_prefix=None, progress=True):
         if url.startswith("https://github.com"):
-            cdn_url = "https://github.91chifun.workers.dev/" + url
+            cdn_url = "https://dl.chenyf.workers.dev/" + url
             return download_url_to_file(cdn_url, dst, hash_prefix, progress)
     hub.download_url_to_file = _cn_download_url_to_file
 
