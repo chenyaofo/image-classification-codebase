@@ -48,7 +48,7 @@ def _cifar(root, image_size, mean, std, batch_size, num_workers, is_vit, dataset
         val_transforms = get_vit_val_transforms(mean, std, image_size)
     else:
         train_transforms = get_train_transforms(mean, std)
-        val_transforms = get_train_transforms(mean, std)
+        val_transforms = get_val_transforms(mean, std)
 
     trainset = dataset_builder(root, train=True, transform=train_transforms, download=True)
     valset = dataset_builder(root, train=False, transform=val_transforms, download=True)
