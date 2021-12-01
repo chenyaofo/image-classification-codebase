@@ -97,7 +97,7 @@ def excute_pipeline(
         metric_store += evaluate_one_epoch(
             epoch=epoch,
             model=model,
-            loader=train_loader,
+            loader=val_loader,
             criterion=criterion,
             optimizer=optimizer,
             scheduler=scheduler,
