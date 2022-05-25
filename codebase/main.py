@@ -170,7 +170,7 @@ def _init(local_rank: int, ngpus_per_node: int, args: Args):
     rank = args.node_rank*ngpus_per_node+local_rank
     init_logger(rank=rank, filenmae=args.output_dir/"default.log")
 
-    patch_download_in_cn()
+    # patch_download_in_cn()
 
     if StateCheckPoint(args.output_dir).is_ckpt_exists():
         _logger.info("-"*30+"Resume from the last training checkpoints."+"-"*30)
