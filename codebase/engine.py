@@ -81,6 +81,13 @@ def _run_one_epoch(is_training: bool,
             time_cost_metric.reset()
             speed_tester.reset()
 
+    _logger.info(", ".join([
+        phase.upper(),
+        f"epoch={epoch:04d} {phase} complete",
+        f"{loss_metric}",
+        f"{accuracy_metric}",
+    ]))
+
     return {
         f"{phase}/lr": lr,
         f"{phase}/loss": loss_metric.compute(),
