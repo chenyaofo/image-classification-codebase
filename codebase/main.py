@@ -42,33 +42,17 @@ def excute_pipeline(
     max_epochs: int,
     train_loader: torch.utils.data.DataLoader,
     val_loader: torch.utils.data.DataLoader,
-    model: nn.Module,
-    optimizer: optim.Optimizer,
-    criterion: nn.Module,
-    scheduler: optim.lr_scheduler._LRScheduler,
-    metric_store: MetricsStore,
-    use_amp: bool,
-    accmulated_steps: int,
-    device: str,
-    memory_format: str,
-    log_interval: int,
     writer: SummaryWriter,
     state_ckpt: StateCheckPoint,
     states: dict,
+    metric_store: MetricsStore,
+    **kwargs
 ):
     if only_evaluate:
         metric_store += evaluate_one_epoch(
             epoch=0,
-            model=model,
             loader=val_loader,
-            criterion=criterion,
-            optimizer=optimizer,
-            scheduler=scheduler,
-            use_amp=use_amp,
-            accmulated_steps=accmulated_steps,
-            device=device,
-            memory_format=memory_format,
-            log_interval=log_interval
+            **kwargs
         )
         return
 
@@ -82,34 +66,18 @@ def excute_pipeline(
 
         metric_store += train_one_epoch(
             epoch=epoch,
-            model=model,
             loader=train_loader,
-            criterion=criterion,
-            optimizer=optimizer,
-            scheduler=scheduler,
-            use_amp=use_amp,
-            accmulated_steps=accmulated_steps,
-            device=device,
-            memory_format=memory_format,
-            log_interval=log_interval
+            **kwargs
         )
 
         metric_store += evaluate_one_epoch(
             epoch=epoch,
-            model=model,
             loader=val_loader,
-            criterion=criterion,
-            optimizer=optimizer,
-            scheduler=scheduler,
-            use_amp=use_amp,
-            accmulated_steps=accmulated_steps,
-            device=device,
-            memory_format=memory_format,
-            log_interval=log_interval
+            **kwargs
         )
 
-        for k, v in metric_store.get_last_metrics().items():
-            writer.add_scalar(k, v, epoch)
+        for name, metric in metric_store.get_last_metrics().items():
+            writer.add_scalar(name, metric, epoch)
 
         state_ckpt.save(metric_store=metric_store, states=states)
 
@@ -208,19 +176,19 @@ def main_worker(local_rank: int,
         max_epochs=conf.get_int("max_epochs"),
         train_loader=train_loader,
         val_loader=val_loader,
+        writer=writer,
+        state_ckpt=saver,
+        states=states,
+        metric_store=metric_store,
         model=model,
         optimizer=optimizer,
         criterion=criterion,
         scheduler=scheduler,
-        metric_store=metric_store,
         use_amp=conf.get_bool("use_amp"),
         accmulated_steps=conf.get_int("accmulated_steps"),
         device=get_device(),
         memory_format=getattr(torch, conf.get("memory_format")),
         log_interval=conf.get_int("log_interval"),
-        writer=writer,
-        state_ckpt=saver,
-        states=states,
     )
 
 
