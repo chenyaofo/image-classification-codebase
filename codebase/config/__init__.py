@@ -47,7 +47,7 @@ def get_args(argv=sys.argv):
     elif is_valid_domain(args.dist_url) or is_valid_ip(args.dist_url):
         args.dist_url = f"tcp://{args.dist_url}:{get_free_port()}"
 
-    args.conf = ConfigFactory.parse_file(args.conf)
+    args.conf:ConfigTree = ConfigFactory.parse_file(args.conf)
     args.output_dir.mkdir(parents=True, exist_ok=True)
 
     if args.modifications is not None:
