@@ -125,7 +125,7 @@ def prepare_for_training(conf: ConfigTree, output_dir: str, local_rank: int):
     load_from = model_config.pop("load_from")
     model: nn.Module = MODEL.build_from(model_config)
     if load_from is not None:
-        model.load_state_dict(torch.load(conf.get("model.load_from"), map_location="cpu"))
+        model.load_state_dict(torch.load(load_from, map_location="cpu"))
 
     if is_dist_avail_and_init() and conf.get_bool("sync_batchnorm"):
         model = nn.SyncBatchNorm.convert_sync_batchnorm(model)
