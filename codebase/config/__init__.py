@@ -7,7 +7,7 @@ from typing import List, Optional
 
 from pyhocon import ConfigFactory, ConfigTree
 
-from codebase.torchutils.common import get_free_port
+from codebase.torchutils.common import get_free_port, apply_modifications
 from codebase.torchutils.typed_args import TypedArgs, add_argument
 
 
@@ -50,14 +50,6 @@ def get_args(argv=sys.argv):
     args.conf:ConfigTree = ConfigFactory.parse_file(args.conf)
     args.output_dir.mkdir(parents=True, exist_ok=True)
 
-    if args.modifications is not None:
-        for modifition in args.modifications:
-            key, value = modifition.split("=")
-            try:
-                eval_value = eval(value)
-            except Exception:
-                eval_value = value
-            if key not in args.conf:
-                raise ValueError(f"Key '{key}'' is not in the config tree!")
-            args.conf.put(key, eval_value)
+    apply_modifications(modifications=args.modifications, conf=args.conf)
+
     return args
