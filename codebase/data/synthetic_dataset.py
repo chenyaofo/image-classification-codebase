@@ -23,7 +23,7 @@ class SyntheticDataLoader:
         return self.images, self.targets
 
     def __len__(self):
-        return 100
+        return 100000
 
 
 @DATA.register
