@@ -18,6 +18,8 @@ You can get started with a resnet20 convolution network on cifar10 with the foll
 CUDA_VISIBLE_DEVICES=0 python -m entry.run --conf conf/cifar10.conf -o output/cifar10/resnet20
 ```
 
+> Tips: run `CUDA_VISIBLE_DEVICES=0 python -m entry.run --conf conf/resnet50-benchmark.conf -o output/benchmark` to check throughput performance, more details can be found at [doc/benchmark.md](doc/benchmark.md)
+
 You can use multiple GPUs to accelerate the training with distributed data parallel:
 
 **Single node, multiple GPUs:**

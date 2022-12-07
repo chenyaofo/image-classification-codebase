@@ -6,6 +6,7 @@ We test this code on NVIDIA A100 and report the throughput in the followings.
 | baseline | 928 |
 | +channels_last | 992 |
 | +amp | 1459 |
+| +channels_last&&amp | 2260 |
 
 > Check for NVIDIA impl and **Throughput Benchmark** at https://github.com/NVIDIA/DeepLearningExamples/blob/master/PyTorch/Classification/ConvNets/resnet50v1.5/README.md#training-performance-results
 
