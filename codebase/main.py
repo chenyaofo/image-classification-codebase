@@ -98,10 +98,6 @@ def prepare_for_training(conf: ConfigTree, output_dir: str, local_rank: int):
     if is_dist_avail_and_init() and conf.get_bool("sync_batchnorm"):
         model = nn.SyncBatchNorm.convert_sync_batchnorm(model)
 
-    image_size = conf.get_int('data.image_size')
-    _logger.info(f"Model details: n_params={compute_nparam(model)/1e6:.2f}M, "
-                 f"flops={compute_flops(model,(1,3, image_size, image_size))/1e6:.2f}M.")
-
     train_loader, val_loader = DATA.build_from(conf.get("data"), dict(local_rank=local_rank))
 
     criterion = CRITERION.build_from(conf.get("criterion"))
@@ -117,6 +113,10 @@ def prepare_for_training(conf: ConfigTree, output_dir: str, local_rank: int):
     if torch.cuda.is_available():
         model = model.to(device=get_device(), memory_format=getattr(torch, conf.get("memory_format")))
         criterion = criterion.to(device=get_device())
+
+    image_size = conf.get_int('data.image_size')
+    _logger.info(f"Model details: n_params={compute_nparam(model)/1e6:.2f}M, "
+                 f"flops={compute_flops(model,(1,3, image_size, image_size))/1e6:.2f}M.")
 
     writer = only_master(SummaryWriter(output_dir))
 
