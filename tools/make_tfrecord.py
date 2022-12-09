@@ -8,6 +8,8 @@ import datetime
 from multiprocessing import Process
 from torchvision.datasets.folder import ImageFolder
 
+from codebase.torchutils.serialization import jsonpack
+
 import struct
 import tfrecord
 
@@ -83,7 +85,7 @@ def write_samples_into_single_shard(pattern, shard_id, samples, map_func, kwargs
         raw_data = map_func(item)
         size += len(raw_data["image"][0])
         writer.write(raw_data)
-        
+
         if i % 1000 == 0:
             print(f"[{datetime.datetime.now()}] complete to write {i:06d} samples to shard {fname}")
     writer.close()
@@ -104,8 +106,14 @@ def main(source, dest, num_shards, num_workers):
         name, class_idx = item
         with open(os.path.join(name), "rb") as stream:
             image = stream.read()
+
+        *_, train_or_val, class_name, filename = os.path.split(name)
         sample = {
-            "fname": (bytes(os.path.splitext(os.path.basename(name))[0], "utf-8"), "byte"),
+            # "fname": (bytes(os.path.splitext(os.path.basename(name))[0], "utf-8"), "byte"),
+            "metadata": (
+                jsonpack(dict(path=os.path.join(train_or_val, class_name, filename)), maxlen=128),
+                "byte"
+            ),
             "image": (image, "byte"),
             "label": (class_idx, "int")
         }
@@ -124,13 +132,13 @@ if __name__ == "__main__":
     dest = "/userhome/imagenet2012/tfrecord"
     main(
         source=os.path.join(source, "train"),
-        dest = os.path.join(dest, "train", "imagenet-1k-train-%06d.tfrecord"),
+        dest=os.path.join(dest, "train", "imagenet-1k-train-%06d.tfrecord"),
         num_shards=256,
         num_workers=8
     )
     main(
         source=os.path.join(source, "val"),
-        dest = os.path.join(dest, "val", "imagenet-1k-val-%06d.tfrecord"),
+        dest=os.path.join(dest, "val", "imagenet-1k-val-%06d.tfrecord"),
         num_shards=256,
         num_workers=8
     )
