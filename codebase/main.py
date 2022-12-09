@@ -30,7 +30,7 @@ from codebase.torchutils.common import patch_download_in_cn
 from codebase.torchutils.common import only_master
 from codebase.torchutils.distributed import distributed_init, is_dist_avail_and_init, is_master, world_size
 from codebase.torchutils.metrics import EstimatedTimeArrival
-from codebase.torchutils.logging_ import init_logger, create_code_snapshot
+from codebase.torchutils.logging import init_logger, create_code_snapshot
 
 
 _logger = logging.getLogger(__name__)
