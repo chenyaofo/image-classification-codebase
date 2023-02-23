@@ -80,8 +80,6 @@ Finally, enjoy the code.
   author = {Yaofo Chen},
   title = {Image Classification Codebase},
   year = {2021},
-  publisher = {GitHub},
-  journal = {GitHub repository},
   howpublished = {\url{https://github.com/chenyaofo/image-classification-codebase}}
 }
 ```
