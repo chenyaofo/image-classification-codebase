@@ -13,7 +13,6 @@ from codebase.torchutils.serialization import jsonpack
 import struct
 import tfrecord
 
-
 def create_index(tfrecord_file: str, index_file: str) -> None:
     """
     refer to https://github.com/vahidk/tfrecord/blob/master/tfrecord/tools/tfrecord2idx.py
@@ -95,50 +94,56 @@ def write_samples_into_single_shard(pattern, shard_id, samples, map_func, kwargs
     return size
 
 
-def main(source, dest, num_shards, num_workers):
-    root = source
+def main(dataset_root, dataset_split_root, dest, pattern, num_shards, num_workers):
     items = []
-    dataset = ImageFolder(root=root,  loader=lambda x: x)
+    dataset = ImageFolder(root=dataset_split_root,  loader=lambda x: x)
     for i in range(len(dataset)):
-        items.append(dataset[i])
+        path, class_idx = dataset[i]
+        relpath = os.path.relpath(path, dataset_root)
+        items.append((path, relpath, class_idx))
 
     def map_func(item):
-        name, class_idx = item
-        with open(os.path.join(name), "rb") as stream:
+        path, relpath, class_idx = item
+        with open(os.path.join(path), "rb") as stream:
             image = stream.read()
 
-        *_, train_or_val, class_name, filename = os.path.split(name)
         sample = {
             # "fname": (bytes(os.path.splitext(os.path.basename(name))[0], "utf-8"), "byte"),
             "metadata": (
-                jsonpack(dict(path=os.path.join(train_or_val, class_name, filename)), maxlen=128),
+                jsonpack(dict(path=relpath), maxlen=128),
                 "byte"
             ),
             "image": (image, "byte"),
             "label": (class_idx, "int")
         }
         return sample
+    
+    os.makedirs(dest, exist_ok=False)
     make_wds_shards(
-        pattern=dest,
-        num_shards=num_shards,  # 设置分片数量
-        num_workers=num_workers,  # 设置创建wds数据集的进程数
+        pattern=os.path.join(dest, pattern),
+        num_shards=num_shards,
+        num_workers=num_workers,
         samples=items,
         map_func=map_func,
     )
 
 
 if __name__ == "__main__":
-    source = "/gdata/imagenet2012/"
-    dest = "/userhome/imagenet2012/tfrecord"
+    source = os.path.expanduser("/home/chenyaofo/datasets/imagenet")
+    dest = os.path.expanduser("/home/chenyaofo/datasets/imagenet-tfrec")
     main(
-        source=os.path.join(source, "train"),
-        dest=os.path.join(dest, "train", "imagenet-1k-train-%06d.tfrecord"),
-        num_shards=256,
+        dataset_root=source,
+        dataset_split_root=os.path.join(source, "train"),
+        dest=os.path.join(dest, "train"),
+        pattern="%06d.tfrecord",
+        num_shards=1024,
         num_workers=8
     )
     main(
-        source=os.path.join(source, "val"),
-        dest=os.path.join(dest, "val", "imagenet-1k-val-%06d.tfrecord"),
+        dataset_root=source,
+        dataset_split_root=os.path.join(source, "val"),
+        dest=os.path.join(dest, "val"),
+        pattern="%06d.tfrecord",
         num_shards=256,
         num_workers=8
     )
