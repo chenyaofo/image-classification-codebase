@@ -1,9 +1,6 @@
-import torch.nn as nn
-
 from .register import CRITERION
+from codebase.torchutils.common import load_modules
 
 
-CRITERION.register(nn.CrossEntropyLoss)
-
-load_modules(__file__)
+load_modules(__name__, __file__)
     
