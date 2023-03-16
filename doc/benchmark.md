@@ -94,7 +94,7 @@ We test this code on NVIDIA V100 and report the throughput in the followings.
 | --- | --- |
 | baseline | 102 |
 | +amp | 360 |
-| amp&&compile(default) | 289 |
+| +amp&&compile(default) | 289 |
 
  - Benchmarks on SwinTransformer-tiny
 
@@ -102,7 +102,7 @@ We test this code on NVIDIA V100 and report the throughput in the followings.
 | --- | --- |
 | baseline | 264 |
 | +amp | 499 |
-| amp&&compile(default) | 789 |
+| +amp&&compile(default) | 789 |
 
 Test environment:
 
