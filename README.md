@@ -10,7 +10,13 @@ The code is tested on `python==3.9, pyhocon==0.3.57, torch=1.8.0, torchvision=0.
 
 ## Get Started
 
-You can get started with a resnet20 convolution network on cifar10 with the following command.
+First, clone this repo:
+
+```
+git clone --recursive https://github.com/chenyaofo/image-classification-codebase
+```
+
+Then, you can get started with a resnet20 convolution network on cifar10 with the following command.
 
 **Single node, single GPU:**
 
@@ -20,7 +26,7 @@ CUDA_VISIBLE_DEVICES=0 python -m entry.run --conf conf/cifar10.conf -o output/ci
 
 > Tips: run `CUDA_VISIBLE_DEVICES=0 python -m entry.run --conf conf/resnet50-benchmark.conf -o output/benchmark` to check throughput performance, more details can be found at [doc/benchmark.md](doc/benchmark.md)
 
-You can use multiple GPUs to accelerate the training with distributed data parallel:
+If you want to use multiple GPUs to accelerate the training with distributed data paralle, you can run the following command:
 
 **Single node, multiple GPUs:**
 
